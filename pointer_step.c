@@ -1,10 +1,12 @@
 #include <stdio.h>
+//#pragma pack(push,1)
 struct S{
 	int x;
 	char c;
 	float f;
 	double d;
 };
+//#pragma pack(pop)
 int main(void){
 	int x=5;
 	char c='h';
@@ -31,4 +33,21 @@ int main(void){
 		(char*)(pd+1)-(char*)pd);
 	printf("ptr s diff=%td\n",
 		(char*)(ps+1)-(char*)ps);
+
+
+	printf("sizeof(void*)*8=%zu\n",
+		sizeof(void*)*8);
+	printf("c=%c\n",c);
+	printf("c=0x%02X\n",(unsigned char)c);
+	printf("&c=%p\n",(void*)&c);
+	printf("pc=%p\n",(void*)pc);
+
+	int a[3]={10,20,30};
+	printf("(a+2)-a=%td\n",(a+2)-a);
+	printf("(char*)(a+2)-(char*)a=%td\n",
+		(char*)(a+2)-(char*)a);
+
+
 }
+
+
