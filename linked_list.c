@@ -1,92 +1,74 @@
 #include <stdio.h>
 #include <stdlib.h>
-typedef struct Node{
+struct Node{
 	int val;
-	struct Node *next;
-}Node;
-void print_list(Node *head){
-	Node *cur=head;
-	while(cur){
-		printf("%2d-> ",cur->val);
-		cur=cur->next;
+	struct Node* next;
+ };
+int main(void){
+	int x;
+	int ret;
+	struct Node *head=NULL;
+	struct Node *tail=NULL;
+	printf("Enter a number to create Node,"
+		"enter ctr+d to stop\n");
+	while((ret=scanf("%d",&x))!= EOF){
+		if(ret==1){
+			printf("x=%d\n",x);
+			struct Node *p=
+			malloc(sizeof(struct Node));
+			p->val=x;
+			p->next=NULL;
+			if(head==NULL){
+				head=tail=p;
+			}else{tail->next=p;tail=p;}
+		}else scanf("%*s");
+	}
+	for(struct Node *n=head;n;n=n->next){
+		printf("[%d]->",n->val);
 	}
 	printf("NULL\n");
-}
-void append(Node *head,Node *new_node){
-	Node *cur=head;
-	while(cur->next){cur=cur->next;}
-	cur->next=new_node;
-}
-Node* create_node(int val){
-	Node *p=malloc(sizeof(Node));
-	p->val=val;
-	p->next=NULL;
-	return p;
-}
-void free_list(Node *head){
-	Node *cur=head;
-	while(cur){
-		Node *next=cur->next;
-		free(cur);
-		cur=next;
+	while(head){
+		struct Node *n=head->next;
+		free(head);
+		head=n;
 	}
-}
-void delete_node(Node **head,int val){
-	Node *cur=*head,*prev=NULL;
-	while(cur){
-		if(cur->val==val){
-			if(prev){
-				prev->next=cur->next;
-			}else{
-				*head=cur->next;
-			}
-			printf("Delete val:%d\n",val);
-			print_list(*head);
-			free(cur);
-			return;
-		}
-		prev=cur;
-		cur=cur->next;
+
+
+
+
+
+
+
+
+
+
+/**	int x; 
+	int ret;
+	while((ret=scanf("%d",&x))!= EOF ){
+		if(ret==0)scanf("%*s");
+		else printf("x=%d,ret=%d\n",x,ret);
 	}
-}
-void insert_node(Node **head,int val){
-	Node *cur=*head,*prev=NULL;
-	Node *new_node=create_node(val);
-	while(cur){
-		if(cur->val>val){
-			if(prev){
-				prev->next=new_node;
-			}else{
-				*head=new_node;
-			}
-			printf("Insert Node:%d\n",val);
-			new_node->next=cur;
-			print_list(*head);
-			return;
-		}
-		prev=cur;
-		cur=cur->next;
+	struct Node *a=malloc(sizeof(struct Node));
+	struct Node *b=malloc(sizeof(struct Node));
+	struct Node *c=malloc(sizeof(struct Node));
+	a->val=10;b->val=20;c->val=30;
+	a->next=b;b->next=c;
+	for(struct Node* n=a;n;n=n->next){
+		printf("%d\n",n->val);
 	}
-	printf("Insert Node:%d\n",val);
-	prev->next=new_node;
-	print_list(*head);
-}
-int main(void){
-	Node *a=create_node(100);
-	Node *b=create_node(200);
-	Node *c=create_node(300);
-	append(a,b);
-	append(a,c);
-	Node *d=create_node(400);
-	append(a,d);
-	Node *e=create_node(500);
-	append(a,e);
- 	print_list(a);
-	delete_node(&a,200);
-	delete_node(&a,100);
-	delete_node(&a,500);
-	insert_node(&a,50);
-	insert_node(&a,250);
-	insert_node(&a,550);
-	free_list(a);
+	free(a);free(b);free(c);
+	struct Node na={1,NULL};
+	struct Node nb={2,NULL};
+	struct Node nc={3,NULL};
+	na.next=&nb;
+	nb.next=&nc;
+	struct Node* p=&na;
+	while(p){
+		printf("%d \n",p->val);
+		p=p->next;
+	}
+	printf("&na=%p  &nb=%p  &nc=%p\n", &na, &nb, &nc);
+	printf("na.next=%p  nb.next=%p  nc.next=%p\n",
+		na.next,nb.next,nc.next);
+**/
 }
