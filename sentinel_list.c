@@ -61,7 +61,7 @@ int insert_before(Node *pos,Node *x){
 int list_erase(Node *x){
 	assert(x&&!x->is_sentinel);
    	assert(x->next && x->prev);
-    	assert(x->next->prev == x && x->prev->next == x);
+	assert(x->next->prev == x && x->prev->next == x);
 	x->next->prev=x->prev;
 	x->prev->next=x->next;
 	x->next=x->prev=NULL;
