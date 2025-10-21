@@ -49,6 +49,7 @@ void list_init(Node *H){
 	list_verify(H);
 }
 int insert_after(Node *pos,Node *x){
+	assert(pos->next->prev == pos && pos->prev->next == pos);
 	assert(pos && x);
 	assert(!x->is_sentinel);
 	assert(x->next == NULL && x->prev == NULL);
@@ -59,6 +60,7 @@ int insert_after(Node *pos,Node *x){
   	return 1;
 }
 int insert_before(Node *pos,Node *x){
+	assert(pos->next->prev == pos && pos->prev->next == pos);
 	Node *prev=pos->prev;
 	insert_after(prev,x);
 	return 1;
