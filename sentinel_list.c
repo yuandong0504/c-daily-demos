@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <stdbool.h>
 typedef struct Node{
 	struct Node *prev,*next;
 	int val;
-	int is_sentinel;
+	bool is_sentinel;
 }Node;
 void list_verify(Node *H){
 	assert(H);
-	assert(H->is_sentinel==1);
+	assert(H->is_sentinel);
 	assert(H->prev&&H->next);
 	assert(H->prev->next==H);
 	assert(H->next->prev==H);
@@ -26,7 +27,7 @@ void list_verify(Node *H){
 	n=H->prev;
 	while(n!=H){
 		cnt_ccw++;
-		assert(n->is_sentinel!=1);
+		assert(!n->is_sentinel);
 		assert(n->prev->next==n);
 		assert(n->next->prev==n);
 		n=n->prev;
@@ -58,7 +59,7 @@ int insert_before(Node *pos,Node *x){
 	return 1;
 }
 int list_erase(Node *x){
-	assert(x&&x->is_sentinel!=1);
+	assert(x&&!x->is_sentinel);
 	x->next->prev=x->prev;
 	x->prev->next=x->next;
 	x->next=x->prev=NULL;
@@ -80,6 +81,7 @@ static inline Node *node_new(int val){
 	Node *p=calloc(1,sizeof(*p));
 	assert(p&&"OOM");
 	p->val=val;
+	p->is_sentinel=false;
 	return p;
 }
 int main(void){
