@@ -18,7 +18,7 @@ void list_verify(Node *H){
 	Node *n=H->next;
 	while(n!=H){
 		cnt_cw++;
-		assert(n->is_sentinel!=1);
+		assert(!n->is_sentinel);
 		assert(n->next->prev==n);
 		assert(n->prev->next==n);
 		n=n->next;
@@ -43,7 +43,7 @@ void list_verify(Node *H){
 void list_init(Node *H){
 	H->prev=H;
 	H->next=H;
-	H->is_sentinel=1;
+	H->is_sentinel=true;
 	list_verify(H);
 }
 int insert_after(Node *pos,Node *x){
@@ -60,6 +60,8 @@ int insert_before(Node *pos,Node *x){
 }
 int list_erase(Node *x){
 	assert(x&&!x->is_sentinel);
+   	assert(x->next && x->prev);
+    	assert(x->next->prev == x && x->prev->next == x);
 	x->next->prev=x->prev;
 	x->prev->next=x->next;
 	x->next=x->prev=NULL;
