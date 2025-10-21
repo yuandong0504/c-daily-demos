@@ -58,6 +58,7 @@ int insert_before(Node *pos,Node *x){
 	return 1;
 }
 int list_erase(Node *x){
+	assert(x&&x->is_sentinel!=1);
 	x->next->prev=x->prev;
 	x->prev->next=x->next;
 	x->next=x->prev=NULL;
@@ -75,23 +76,26 @@ void list_print(Node *H,const char *tag){
 	printf("\n");
 }
 int list_empty(Node *H){return H->next==H;}
+static inline Node *node_new(int val){
+	Node *p=calloc(1,sizeof(*p));
+	assert(p&&"OOM");
+	p->val=val;
+	return p;
+}
 int main(void){
 	Node H;
 	list_init(&H);
-	Node *n=calloc(1,sizeof(*n));
-	n->val=1;
+	Node *n=node_new(1);
 	insert_after(&H,n);
 	list_verify(&H);
 	list_print(&H,"Insert 1 after H");
 
-Node *n0=calloc(1,sizeof(*n0));
-n0->val=0;
+Node *n0=node_new(0);
 insert_before(n,n0);
 list_verify(&H);
 list_print(&H,"Insert 0 before 1");
 
-Node *n2=calloc(1,sizeof(*n2));
-n2->val=2;
+Node *n2=node_new(2);
 insert_after(n,n2);
 list_verify(&H);
 list_print(&H,"Insert 2 after 1");
@@ -115,8 +119,7 @@ free(n0);
 n0=NULL;
 
 for(int i=0;i<5;++i){
-	Node *x=calloc(1,sizeof(*x));
-	x->val=i*5;
+	Node *x=node_new(i*10);
 	insert_before(&H,x);
 	list_verify(&H);
 }
@@ -128,6 +131,7 @@ while(!list_empty(&H)){
 	free(y);
 	list_verify(&H);
 }
+assert(list_empty(&H));
 list_print(&H,"clean up");
 	return 0;
 }
