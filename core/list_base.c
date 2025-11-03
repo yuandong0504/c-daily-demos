@@ -63,8 +63,7 @@ bool insert_after(Node *pos,Node *x){
 bool insert_before(Node *pos,Node *x){
 	assert(pos->next->prev == pos && pos->prev->next == pos);
 	Node *prev=pos->prev;
-	insert_after(prev,x);
-	return true;
+	return insert_after(prev,x);
 }
 bool list_erase(Node *x){
 	assert(x&&!x->is_sentinel);
@@ -80,10 +79,10 @@ static inline void file_print(const File *f){
 }
 void list_print(const Node *H,const char *tag){
 	printf("%s:",tag);
-	Node *n=H->next;
+	const Node *n=H->next;
 	if(n==H){printf("[]\n");return;}
 	while(n!=H){
-		file_print(&n->data);
+ 		file_print(&n->data);
 		n=n->next;
 		if(n!=H)printf("<->");
 	}
