@@ -49,7 +49,7 @@ void list_init(Node *H){
 	H->is_sentinel=true;
 	list_verify(H);
 }
-int insert_after(Node *pos,Node *x){
+bool insert_after(Node *pos,Node *x){
 	assert(pos->next->prev == pos && pos->prev->next == pos);
 	assert(pos && x);
 	assert(!x->is_sentinel);
@@ -58,36 +58,38 @@ int insert_after(Node *pos,Node *x){
 	pos->next->prev=x;
 	pos->next=x;
 	x->prev=pos;
-  	return 1;
+  	return true;
 }
-int insert_before(Node *pos,Node *x){
+bool insert_before(Node *pos,Node *x){
 	assert(pos->next->prev == pos && pos->prev->next == pos);
 	Node *prev=pos->prev;
 	insert_after(prev,x);
-	return 1;
+	return true;
 }
-int list_erase(Node *x){
+bool list_erase(Node *x){
 	assert(x&&!x->is_sentinel);
    	assert(x->next && x->prev);
 	assert(x->next->prev == x && x->prev->next == x);
 	x->next->prev=x->prev;
 	x->prev->next=x->next;
 	x->next=x->prev=NULL;
-	return 1;
+	return true;
 }
-void list_print(Node *H,const char *tag){
+static inline void file_print(const File *f){
+	printf("[%d|%zu|%s]",f->type,f->size,f->name);
+}
+void list_print(const Node *H,const char *tag){
 	printf("%s:",tag);
 	Node *n=H->next;
 	if(n==H){printf("[]\n");return;}
 	while(n!=H){
-		File f=n->data;
-		printf("[%d|%zu|%s]",f.type,f.size,f.name);
+		file_print(&n->data);
 		n=n->next;
 		if(n!=H)printf("<->");
 	}
 	printf("\n");
 }
-int list_empty(Node *H){return H->next==H;}
+bool list_empty(const Node *H){return H->next==H;}
 static inline Node *node_new(File data){
 	Node *p=calloc(1,sizeof(*p));
 	assert(p&&"OOM");
