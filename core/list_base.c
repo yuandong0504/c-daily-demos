@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdbool.h>
+#include "model.h"
 typedef struct Node{
 	struct Node *prev,*next;
 	int val;
+	File data;
 	bool is_sentinel;
 }Node;
 void list_verify(Node *H){
