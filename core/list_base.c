@@ -3,12 +3,13 @@
 #include <assert.h>
 #include <stdbool.h>
 #include "model.h"
-typedef struct Node{
+#include "list_base.h"
+struct Node{
 	struct Node *prev,*next;
 	File data;
 	bool is_sentinel;
-}Node;
-void list_verify(Node *H){
+};
+void list_verify(const Node *H){
 	assert(H);
 	assert(H->is_sentinel);
 	assert(H->prev&&H->next);
