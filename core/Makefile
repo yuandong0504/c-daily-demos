@@ -24,4 +24,4 @@ filter: filter.c model.h list_base.h
 
 # ---- 清理 ----
 clean:
-	rm -f $(TARGETS)
+	rm -f $(TARGETS) *.o *.gch
