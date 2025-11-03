@@ -4,11 +4,6 @@
 #include <stdbool.h>
 #include "model.h"
 #include "list_base.h"
-struct Node{
-	struct Node *prev,*next;
-	File data;
-	bool is_sentinel;
-};
 void list_verify(const Node *H){
 	assert(H);
 	assert(H->is_sentinel);
@@ -90,14 +85,14 @@ void list_print(const Node *H,const char *tag){
 	printf("\n");
 }
 bool list_empty(const Node *H){return H->next==H;}
-static inline Node *node_new(File data){
+Node* node_new(File data){
 	Node *p=calloc(1,sizeof(*p));
 	assert(p&&"OOM");
 	p->data=data;
 	p->is_sentinel=false;
 	return p;
 }
-int main(void){
+/**int main(void){
 	Node H;
 	list_init(&H);
 	Node *n=node_new((File){1,900,"var/sys.log"});
@@ -143,4 +138,4 @@ while(!list_empty(&H)){
 assert(list_empty(&H));
 list_print(&H,"clean up");
 	return 0;
-}
+}**/
