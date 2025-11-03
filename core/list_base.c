@@ -5,7 +5,6 @@
 #include "model.h"
 typedef struct Node{
 	struct Node *prev,*next;
-	int val;
 	File data;
 	bool is_sentinel;
 }Node;
@@ -81,34 +80,36 @@ void list_print(Node *H,const char *tag){
 	Node *n=H->next;
 	if(n==H){printf("[]\n");return;}
 	while(n!=H){
-		printf("[%d]",n->val);
+		File f=n->data;
+		printf("[%d|%zu|%s]",f.type,f.size,f.name);
 		n=n->next;
 		if(n!=H)printf("<->");
 	}
 	printf("\n");
 }
 int list_empty(Node *H){return H->next==H;}
-static inline Node *node_new(int val){
+static inline Node *node_new(File data){
 	Node *p=calloc(1,sizeof(*p));
 	assert(p&&"OOM");
-	p->val=val;
+	p->data=data;
 	p->is_sentinel=false;
 	return p;
 }
 int main(void){
 	Node H;
 	list_init(&H);
-	Node *n=node_new(1);
+	Node *n=node_new((File){1,900,"var/sys.log"});
 	insert_after(&H,n);
 	list_verify(&H);
-	list_print(&H,"Insert 1 after H");
+	list_print(&H,"Insert file"
+		"{{1,900,\"var/sys.log\"}} after H");
 
-Node *n0=node_new(0);
+Node *n0=node_new((File){1,1024,"var/tmp.log"});
 insert_before(n,n0);
 list_verify(&H);
 list_print(&H,"Insert 0 before 1");
 
-Node *n2=node_new(2);
+Node *n2=node_new((File){0,900,"test.txt"});
 insert_after(n,n2);
 list_verify(&H);
 list_print(&H,"Insert 2 after 1");
@@ -130,13 +131,6 @@ list_verify(&H);
 list_print(&H,"erase  0");
 free(n0);
 n0=NULL;
-
-for(int i=0;i<5;++i){
-	Node *x=node_new(i*10);
-	insert_before(&H,x);
-	list_verify(&H);
-}
-list_print(&H,"Insert 5 nodes");
 
 while(!list_empty(&H)){
 	Node *y=H.prev;
