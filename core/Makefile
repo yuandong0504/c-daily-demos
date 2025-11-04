@@ -1,27 +1,47 @@
 # ==== core/Makefile ====
+CC      = gcc
+CFLAGS  = -Wall -Wextra -Wconversion -g -MMD -MP
 
-CC = gcc
-CFLAGS = -Wall -Wextra -Wconversion -g
-TARGETS = list_base pred filter
+# 对象文件与测试目标
+OBJS    = list_base.o
+TESTS   = _check_list _check_pred_filter
 
-# 默认目标：显示提示
+.PHONY: all list pred hdrcheck clean
+
+# --- 默认帮助信息 ---
 all:
 	@echo "Usage:"
-	@echo "  make list_base   # build and run list_base.c"
-	@echo "  make pred        # build and run pred.c (later)"
-	@echo "  make filter      # build and run filter.c (later)"
-	@echo "  make clean       # remove all executables"
+	@echo "  make list        # 编译并运行 _check_list.c"
+	@echo "  make pred        # 编译并运行 _check_pred_filter.c"
+	@echo "  make hdrcheck    # 只验证头文件是否可编译"
+	@echo "  make clean       # 清理目标文件"
 
-# ---- 各模块 ----
-list_base: list_base.c model.h list_base.h
-	$(CC) $(CFLAGS) list_base.c -o $@ && ./list_base
+# --- 基础对象（自动追踪头文件依赖） ---
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-pred: pred.c model.h list_base.h
-	$(CC) $(CFLAGS) pred.c -o $@ && ./pred
+# --- 链表模块自测 ---
+_check_list: _check_list.c $(OBJS)
+	$(CC) $(CFLAGS) $< $(OBJS) -o $@
 
-filter: filter.c model.h list_base.h
-	$(CC) $(CFLAGS) filter.c -o $@ && ./filter
+list: _check_list
+	./_check_list
 
-# ---- 清理 ----
+# --- 谓词过滤模块自测 ---
+_check_pred_filter: _check_pred_filter.c pred_filter.c
+	$(CC) $(CFLAGS) _check_pred_filter.c pred_filter.c -o $@
+
+pred: _check_pred_filter
+	./_check_pred_filter
+
+# --- 头文件快速验证（仅语法检查） ---
+hdrcheck:
+	$(CC) $(CFLAGS) -fsyntax-only _check_pred_filter.c
+
+# --- 清理 ---
 clean:
-	rm -f $(TARGETS) *.o *.gch
+	rm -f $(OBJS) $(TESTS) *.o *.gch *.d list pred
+	@echo "[OK] cleaned"
+
+# 自动包含依赖文件 (.d)
+-include $(OBJS:.o=.d)
