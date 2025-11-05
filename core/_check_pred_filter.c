@@ -5,11 +5,11 @@ int main(void){
 		{0,1024,"test.txt"},
 		{1,800,"log.log"}};
 	int t=1;size_t z=600;char *name="log";
-	pred prds[]={{is_type,&t},
+	pred pds[]={{is_type,&t},
 		{size_gt,&z},
 		{has_name,name}};
 	for(int i=0;i<3;i++){
-		if(all_of(&f[i],prds,3)){
+		if(all_of(&f[i],pds,3)){
 			printf("%s\n",f[i].name);
 		}
 	}
