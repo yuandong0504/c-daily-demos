@@ -92,50 +92,28 @@ Node* node_new(File data){
 	p->is_sentinel=false;
 	return p;
 }
-/**int main(void){
-	Node H;
-	list_init(&H);
-	Node *n=node_new((File){1,900,"var/sys.log"});
-	insert_after(&H,n);
-	list_verify(&H);
-	list_print(&H,"Insert file"
-		"{{1,900,\"var/sys.log\"}} after H");
-
-Node *n0=node_new((File){1,1024,"var/tmp.log"});
-insert_before(n,n0);
-list_verify(&H);
-list_print(&H,"Insert 0 before 1");
-
-Node *n2=node_new((File){0,900,"test.txt"});
-insert_after(n,n2);
-list_verify(&H);
-list_print(&H,"Insert 2 after 1");
-
-list_erase(n);
-list_verify(&H);
-list_print(&H,"erase  1");
-free(n);
-n=NULL;
-
-list_erase(n2);
-list_verify(&H);
-list_print(&H,"erase  2");
-free(n2);
-n2=NULL;
-
-list_erase(n0);
-list_verify(&H);
-list_print(&H,"erase  0");
-free(n0);
-n0=NULL;
-
-while(!list_empty(&H)){
-	Node *y=H.prev;
-	list_erase(y);
-	free(y);
-	list_verify(&H);
+void list_filter_print(const Node *H,pred *pds,
+			int n,const char *tag){
+	Node *n0=H->next;
+	printf("%s\n",tag);
+	while(n0!=H){
+		if(all_of(&n0->data,pds,n)){
+			printf("%d|%zu|%s\n",
+				n0->data.type,
+				n0->data.size,
+				n0->data.name);
+		}
+		n0=n0->next;
+	}
 }
-assert(list_empty(&H));
-list_print(&H,"clean up");
-	return 0;
-}**/
+size_t list_count_if(const Node *H,pred *pds,int n){
+	size_t cnt=0;
+	Node *n0=H->next;
+	while (n0!=H){
+		if(all_of(&n0->data,pds,n)){
+			cnt++;
+		}
+		n0=n0->next;
+	}
+	return cnt;
+}
