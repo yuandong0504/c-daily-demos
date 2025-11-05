@@ -9,4 +9,4 @@ typedef struct{
 bool is_type(File *f,void *ctx);
 bool size_gt(File *f,void *ctx);
 bool has_name(File *f,void *ctx);
-bool all_of(File *f,pred *prds,int n);
+bool all_of(File *f,pred *pds,int n);
