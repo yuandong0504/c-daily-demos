@@ -11,9 +11,9 @@ bool has_name(File *f,void *ctx){
 	char *name=(char*)ctx;
 	return strstr(f->name,name)!=NULL;
 }
-bool all_of(File *f,pred *prds,int n){
+bool all_of(File *f,pred *pds,int n){
 	for(int i=0;i<n;i++){
-		if(!prds[i].fn(f,prds[i].ctx)){
+		if(!pds[i].fn(f,pds[i].ctx)){
 			return false;
 		}
 	}
