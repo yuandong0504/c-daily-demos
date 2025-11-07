@@ -16,3 +16,4 @@ void list_filter_print(const Node *H,pred *pds,
 			int n,const char *tag);
 size_t list_count_if(const Node *H,pred *pds,
 			int n);
+void list_free_all(Node *H,void(*free_data)(void *));
