@@ -1,47 +1,47 @@
-# ==== core/Makefile ====
+# ===== core/Makefile =====
 CC      = gcc
-CFLAGS  = -Wall -Wextra -Wconversion -g -MMD -MP
+CFLAGS  = -Wall -Wextra -Wconversion -g
+OBJS    = list_base.o pred_filter.o
+TESTS   = $(patsubst %.c,%,$(wildcard _check_*.c))
 
-# 对象文件与测试目标
-OBJS    = list_base.o
-TESTS   = _check_list _check_pred_filter
-
-.PHONY: all list pred hdrcheck clean
-
-# --- 默认帮助信息 ---
+# ===== 默认帮助 =====
 all:
 	@echo "Usage:"
-	@echo "  make list        # 编译并运行 _check_list.c"
-	@echo "  make pred        # 编译并运行 _check_pred_filter.c"
-	@echo "  make hdrcheck    # 只验证头文件是否可编译"
-	@echo "  make clean       # 清理目标文件"
+	@echo "  make cfa        # 编译并运行 _check_free_all.c"
+	@echo "  make check      # 自动编译并运行所有 _check_*.c 测试"
+	@echo "  make clean      # 清理目标文件"
 
-# --- 基础对象（自动追踪头文件依赖） ---
+# ===== 通用对象规则 =====
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# --- 链表模块自测 ---
-_check_list: _check_list.c $(OBJS)
-	$(CC) $(CFLAGS) $< $(OBJS) -o $@
+# ===== free_all 自测 =====
+cfa: $(OBJS) _check_free_all.c
+	$(CC) $(CFLAGS) $^ -o $@
+	@echo "[RUN] ./cfa"
+	@./$@
 
-list: _check_list
-	./_check_list
+# ===== 自动测试入口 =====
+check: $(OBJS)
+	@TESTS="$(TESTS)"; \
+	if [ -z "$$TESTS" ]; then \
+		echo "[INFO] No _check_*.c files found."; \
+	else \
+		for t in $$TESTS; do \
+			echo "[BUILD] $$t"; \
+			$(CC) $(CFLAGS) $(OBJS) $$t.c -o $$t || exit 1; \
+		done; \
+		echo ""; \
+		echo "===== Running all tests ====="; \
+		for t in $$TESTS; do \
+			echo "[RUN] ./$$t"; \
+			./$$t || exit 1; \
+			echo ""; \
+		done; \
+		echo "[OK] All tests passed."; \
+	fi
 
-# --- 谓词过滤模块自测 ---
-_check_pred_filter: _check_pred_filter.c pred_filter.c
-	$(CC) $(CFLAGS) _check_pred_filter.c pred_filter.c -o $@
-
-pred: _check_pred_filter
-	./_check_pred_filter
-
-# --- 头文件快速验证（仅语法检查） ---
-hdrcheck:
-	$(CC) $(CFLAGS) -fsyntax-only _check_pred_filter.c
-
-# --- 清理 ---
+# ===== 清理 =====
 clean:
-	rm -f $(OBJS) $(TESTS) *.o *.gch *.d list pred
+	rm -f $(OBJS) $(TESTS) *.o *.gch cfa
 	@echo "[OK] cleaned"
-
-# 自动包含依赖文件 (.d)
--include $(OBJS:.o=.d)
