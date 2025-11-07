@@ -1,42 +1,45 @@
-# ===== core/Makefile =====
-CC      = gcc
-CFLAGS  = -Wall -Wextra -Wconversion -g
-OBJS    = list_base.o pred_filter.o
-TESTS   = $(patsubst %.c,%,$(wildcard _check_*.c))
+# ===== Makefile =====
+CC      := gcc
+CFLAGS  := -Wall -Wextra -Wconversion -g -Iinclude
+SRC_DIR := src
+TST_DIR := tests
 
-# ===== 默认帮助 =====
-all:
-	@echo "Usage:"
-	@echo "  make cfa        # 编译并运行 _check_free_all.c"
-	@echo "  make check      # 自动编译并运行所有 _check_*.c 测试"
-	@echo "  make clean      # 清理目标文件"
+# 所有源码对象
+SRCS    := $(wildcard $(SRC_DIR)/*.c)
+OBJS    := $(SRCS:%.c=%.o)
 
-# ===== 通用对象规则 =====
-%.o: %.c
+# 所有测试文件：tests/test_*.c
+TEST_SRCS := $(wildcard $(TST_DIR)/test_*.c)
+TEST_BINS := $(TEST_SRCS:.c=)
+
+.PHONY: all test clean run-%
+
+# 默认执行 test
+all: test
+
+# 源文件 -> .o
+$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# ===== free_all 自测 =====
-cfa: $(OBJS) _check_free_all.c
+# 测试源文件 -> 可执行文件
+$(TST_DIR)/%: $(TST_DIR)/%.c $(OBJS)
+	@echo "[BUILD] $@"
 	$(CC) $(CFLAGS) $^ -o $@
-	@echo "[RUN] ./cfa"
-	@./$@
 
-# ===== 自动测试入口 =====
-check: $(OBJS) $(TESTS)
-	@for t in $(TESTS); do \
-		echo "[BUILD] $$t"; \
-		$(CC) $(CFLAGS) $(OBJS) $$t.c -o $$t || exit 1; \
-	done
-	@echo ""
+# 一键运行所有 tests/test_*.c
+test: $(OBJS) $(TEST_BINS)
 	@echo "===== Running all tests ====="
-	@for t in $(TESTS); do \
-		echo "[RUN] ./$$t"; \
-		./$$t || exit 1; \
-		echo ""; \
+	@set -e; for t in $(TEST_BINS); do \
+		echo "[RUN] $$t"; ./$$t; echo ""; \
 	done
-	@echo "[OK] All tests passed."
+	@echo "[OK] all tests passed."
 
-# ===== 清理 =====
+# 单独运行某个测试
+run-%: $(OBJS) $(TST_DIR)/%
+	@echo "[RUN] $(TST_DIR)/$*"
+	@./$(TST_DIR)/$*
+
+# 清理所有生成文件
 clean:
-	rm -f $(OBJS) $(TESTS) *.o *.gch cfa
+	rm -f $(OBJS) $(TEST_BINS) *.o *.gch
 	@echo "[OK] cleaned"
