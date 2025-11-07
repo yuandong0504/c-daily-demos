@@ -117,3 +117,16 @@ size_t list_count_if(const Node *H,pred *pds,int n){
 	}
 	return cnt;
 }
+void list_free_all(Node *H,void(*free_data)(void*)){
+	Node *cur=H->next;
+	while(cur!=H){
+		Node *next=cur->next;
+		if(free_data){
+			free_data(&cur->data);
+		}
+		list_erase(cur);
+		free(cur);
+		cur=next;
+	}
+}
+
