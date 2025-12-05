@@ -33,6 +33,7 @@ int main(void)
     if(n==-1)
     {
         free(line);
+        return 1;
     }
     printf("line=%s\n",line);
     free(line);
