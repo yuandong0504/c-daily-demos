@@ -18,6 +18,7 @@ ssize_t read_line(char **out)
             if(errno==EINTR){continue;}
             perror("getline");
             free(line);
+            *out=NULL;
             return -1;
         }
         if(line[n-1]=='\n'){line[n-1]='\0';}
@@ -30,11 +31,7 @@ int main(void)
 {
     char *line=NULL;
     ssize_t n=read_line(&line);
-    if(n==-1)
-    {
-        free(line);
-        return 1;
-    }
+    if(n==-1){return 1;}
     printf("line=%s\n",line);
     free(line);
     return 0;
