@@ -7,14 +7,14 @@ typedef enum{
     CMD_SEND_BOTH,
     CMD_EXIT,
     CMD_UNKNOWN
-}commandType;
-typedef struct command{
-    commandType type;
+}CommandType;
+typedef struct Command{
+    CommandType type;
     char *text;
-}command;
-static command parse_command(char *line)
+}Command;
+static Command parse_command(char *line)
 {
-    command cmd={.type=CMD_UNKNOWN,.text=NULL};
+    Command cmd={.type=CMD_UNKNOWN,.text=NULL};
     if(line[0]=='\0')return cmd;
     if(strcmp(line,"exit")==0)
     {
@@ -51,7 +51,7 @@ int main(void)
         {
             line[len-1]='\0';
         }
-        command cmd=parse_command(line);
+        Command cmd=parse_command(line);
         switch(cmd.type)
         {
               case CMD_SEND_A:
@@ -66,7 +66,7 @@ int main(void)
                   break;
               case CMD_EXIT:
                   printf("exit entered\n");
-                  break;
+                  return 0;
               default:
                   printf("unknown commandd\n");
                   break;
