@@ -15,7 +15,7 @@ typedef struct command{
 static command parse_command(char *line)
 {
     command cmd={.type=CMD_UNKNOWN,.text=NULL};
-    if(line[0]=='0')return cmd;
+    if(line[0]=='\0')return cmd;
     if(strcmp(line,"exit")==0)
     {
         cmd.type=CMD_EXIT;
@@ -55,20 +55,20 @@ int main(void)
         switch(cmd.type)
         {
               case CMD_SEND_A:
-                  printf("from a:%s",cmd.text);
+                  printf("from a:%s\n",cmd.text);
                   break;
               case CMD_SEND_B:
-                  printf("from b:%s",cmd.text);
+                  printf("from b:%s\n",cmd.text);
                   break;
               case CMD_SEND_BOTH:
-                  printf("from a:%s",cmd.text);
-                  printf("from b:%s",cmd.text);
+                  printf("from a:%s\n",cmd.text);
+                  printf("from b:%s\n",cmd.text);
                   break;
               case CMD_EXIT:
-                  printf("exit entered");
+                  printf("exit entered\n");
                   break;
               default:
-                  printf("unknown commandd");
+                  printf("unknown commandd\n");
                   break;
         }
     }
