@@ -12,6 +12,15 @@ typedef struct Command{
     CommandType type;
     char *text;
 }Command;
+typedef enum{
+    TARGET_A,
+    TARGET_B,
+    TARGET_BOTH
+}Target;
+typedef struct{
+    Target to;
+    char *payload;
+}Message;
 static Command parse_command(char *line)
 {
     Command cmd={.type=CMD_UNKNOWN,.text=NULL};
@@ -41,6 +50,49 @@ static Command parse_command(char *line)
     }
     return cmd;
 }
+typedef enum{
+    C2M_OK,
+    C2M_CTRL_EXIT,
+    C2M_NOOP
+}C2MResult;
+C2MResult command_to_message(Command *cmd,Message *msg)
+{
+    switch(cmd->type){
+        case CMD_SEND_A:
+            msg->to=TARGET_A;
+            msg->payload=cmd->text;
+            return C2M_OK;
+        case CMD_SEND_B:
+            msg->to=TARGET_B;
+            msg->payload=cmd->text;
+            return C2M_OK;
+        case CMD_SEND_BOTH:
+            msg->to=TARGET_BOTH;
+            msg->payload=cmd->text;
+            return C2M_OK;
+        case CMD_EXIT:
+            return C2M_CTRL_EXIT;
+        case CMD_UNKNOWN:
+        default:
+            return C2M_NOOP;
+    }
+}
+static void dispatch_message(Message *msg)
+{
+    switch(msg->to)
+    {
+        case TARGET_A:
+            printf("[A]:%s\n",msg->payload);
+            break;
+        case TARGET_B:
+            printf("[B]:%s\n",msg->payload);
+            break;
+        case TARGET_BOTH:
+            printf("[A]:%s\n",msg->payload);
+            printf("[B]:%s\n",msg->payload);
+            break;
+    }
+}
 int main(void)
 {
     char line[1024];
@@ -52,23 +104,16 @@ int main(void)
             line[len-1]='\0';
         }
         Command cmd=parse_command(line);
-        switch(cmd.type)
+        Message msg;
+        C2MResult r=command_to_message(&cmd,&msg);
+        switch(r)
         {
-              case CMD_SEND_A:
-                  printf("from a:%s\n",cmd.text);
+              case C2M_OK:
+                  dispatch_message(&msg);
                   break;
-              case CMD_SEND_B:
-                  printf("from b:%s\n",cmd.text);
-                  break;
-              case CMD_SEND_BOTH:
-                  printf("from a:%s\n",cmd.text);
-                  printf("from b:%s\n",cmd.text);
-                  break;
-              case CMD_EXIT:
-                  printf("exit entered\n");
+              case C2M_CTRL_EXIT:
                   return 0;
-              default:
-                  printf("unknown commandd\n");
+              case C2M_NOOP:
                   break;
         }
     }
