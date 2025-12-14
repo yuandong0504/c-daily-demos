@@ -77,19 +77,41 @@ C2MResult command_to_message(Command *cmd,Message *msg)
             return C2M_NOOP;
     }
 }
-static void dispatch_message(Message *msg)
+typedef struct Doer{
+    char *name;
+    void (*handle)(struct Doer *self,const Message *msg);
+}Doer;
+static void doer_A_handle(Doer *self,const Message *msg)
+{
+    (void)self;
+    printf("[A]:%s\n",msg->payload);
+}
+static void doer_B_handle(Doer *self,const Message *  msg)
+{
+    (void)self;
+    printf("[B]:%s\n",msg->payload);
+}
+static Doer doer_A={
+    .name="A",
+    .handle=doer_A_handle
+};
+static Doer doer_B={
+    .name="B",
+    .handle=doer_B_handle
+};
+static void route_message(Message *msg)
 {
     switch(msg->to)
     {
         case TARGET_A:
-            printf("[A]:%s\n",msg->payload);
+            doer_A.handle(&doer_A,msg);
             break;
         case TARGET_B:
-            printf("[B]:%s\n",msg->payload);
+            doer_B.handle(&doer_B,msg);
             break;
         case TARGET_BOTH:
-            printf("[A]:%s\n",msg->payload);
-            printf("[B]:%s\n",msg->payload);
+            doer_A.handle(&doer_A,msg);
+            doer_B.handle(&doer_B,msg);
             break;
     }
 }
@@ -104,12 +126,12 @@ int main(void)
             line[len-1]='\0';
         }
         Command cmd=parse_command(line);
-        Message msg;
+        Message msg={0};
         C2MResult r=command_to_message(&cmd,&msg);
         switch(r)
         {
               case C2M_OK:
-                  dispatch_message(&msg);
+                  route_message(&msg);
                   break;
               case C2M_CTRL_EXIT:
                   return 0;
