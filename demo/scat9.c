@@ -24,6 +24,7 @@ typedef struct{
 static Command parse_command(char *line)
 {
     Command cmd={.type=CMD_UNKNOWN,.text=NULL};
+    while(*line==' '||*line=='\t'){line++;}
     if(line[0]=='\0')return cmd;
     if(strcmp(line,"exit")==0)
     {
@@ -109,42 +110,43 @@ static int inbox_pop(Inbox *q,Message *out)
     q->head=((q->head+1)%INBOX_CAP);
     return 0;
 }
-typedef struct Doer{
+typedef struct Doer Doer;
+struct Doer{
     const char *name;
     Inbox inbox;
-    void (*handle)(struct Doer *self,const Message *msg);
-}Doer;
-static void doer_A_handle(Doer *self,const Message *msg)
+    void (*handle)(Doer *self,const Message *msg);
+};
+static void g_doer_A_handle(Doer *self,const Message *msg)
 {
     (void)self;
     printf("[A]:%s\n",msg->payload);
 }
-static void doer_B_handle(Doer *self,const Message *  msg)
+static void g_doer_B_handle(Doer *self,const Message *  msg)
 {
     (void)self;
     printf("[B]:%s\n",msg->payload);
 }
-static Doer doer_A={
+static Doer g_doer_A={
     .name="A",
-    .handle=doer_A_handle
+    .handle=g_doer_A_handle
 };
-static Doer doer_B={
+static Doer g_doer_B={
     .name="B",
-    .handle=doer_B_handle
+    .handle=g_doer_B_handle
 };
 static void route_message(const Message *msg)
 {
     switch(msg->to)
     {
         case TARGET_A:
-            inbox_push(&doer_A.inbox,msg);
+            inbox_push(&g_doer_A.inbox,msg);
             break;
         case TARGET_B:
-            inbox_push(&doer_B.inbox,msg);
+            inbox_push(&g_doer_B.inbox,msg);
             break;
         case TARGET_BOTH:
-            inbox_push(&doer_A.inbox,msg);
-            inbox_push(&doer_B.inbox,msg);
+            inbox_push(&g_doer_A.inbox,msg);
+            inbox_push(&g_doer_B.inbox,msg);
             break;
     }
 }
@@ -159,8 +161,8 @@ static void dispatch_doer(Doer *d)
 int main(void)
 {
     char line[1024];
-    inbox_init(&doer_A.inbox);
-    inbox_init(&doer_B.inbox);
+    inbox_init(&g_doer_A.inbox);
+    inbox_init(&g_doer_B.inbox);
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
     {
         size_t len=strlen(line);
@@ -181,8 +183,8 @@ int main(void)
               case C2M_NOOP:
                   break;
         }
-        dispatch_doer(&doer_A);
-        dispatch_doer(&doer_B);
+        dispatch_doer(&g_doer_A);
+        dispatch_doer(&g_doer_B);
     }
 
     return 0;
