@@ -77,8 +77,41 @@ C2MResult command_to_message(Command *cmd,Message *msg)
             return C2M_NOOP;
     }
 }
+#define INBOX_CAP 16
+typedef struct{
+    Message msgs[INBOX_CAP];
+    int head;
+    int tail;
+}Inbox;
+static void inbox_init(Inbox *q)
+{
+    q->head=q->tail=0;
+}
+static int inbox_empty(Inbox *q)
+{
+    return q->head==q->tail;
+}
+static int inbox_full(Inbox *q)
+{
+    return ((q->tail+1)%INBOX_CAP)==q->head;
+}
+static int inbox_push(Inbox *q,const Message *m)
+{
+    if(inbox_full(q)) return -1;
+    q->msgs[q->tail]=*m;
+    q->tail=((q->tail+1)%INBOX_CAP);
+    return 0;
+}
+static int inbox_pop(Inbox *q,Message *out)
+{
+    if(inbox_empty(q)) return -1;
+    *out=q->msgs[q->head];
+    q->head=((q->head+1)%INBOX_CAP);
+    return 0;
+}
 typedef struct Doer{
-    char *name;
+    const char *name;
+    Inbox inbox;
     void (*handle)(struct Doer *self,const Message *msg);
 }Doer;
 static void doer_A_handle(Doer *self,const Message *msg)
@@ -99,20 +132,28 @@ static Doer doer_B={
     .name="B",
     .handle=doer_B_handle
 };
-static void route_message(Message *msg)
+static void route_message(const Message *msg)
 {
     switch(msg->to)
     {
         case TARGET_A:
-            doer_A.handle(&doer_A,msg);
+            inbox_push(&doer_A.inbox,msg);
             break;
         case TARGET_B:
-            doer_B.handle(&doer_B,msg);
+            inbox_push(&doer_B.inbox,msg);
             break;
         case TARGET_BOTH:
-            doer_A.handle(&doer_A,msg);
-            doer_B.handle(&doer_B,msg);
+            inbox_push(&doer_A.inbox,msg);
+            inbox_push(&doer_B.inbox,msg);
             break;
+    }
+}
+static void dispatch_doer(Doer *d)
+{
+    Message msg;
+    while(inbox_pop(&d->inbox,&msg)==0)
+    {
+        d->handle(d,&msg);
     }
 }
 int main(void)
@@ -138,6 +179,10 @@ int main(void)
               case C2M_NOOP:
                   break;
         }
+        inbox_init(&doer_A.inbox);
+        inbox_init(&doer_B.inbox);
+        dispatch_doer(&doer_A);
+        dispatch_doer(&doer_B);
     }
 
     return 0;
