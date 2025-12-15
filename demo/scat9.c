@@ -159,6 +159,8 @@ static void dispatch_doer(Doer *d)
 int main(void)
 {
     char line[1024];
+    inbox_init(&doer_A.inbox);
+    inbox_init(&doer_B.inbox);
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
     {
         size_t len=strlen(line);
@@ -179,8 +181,6 @@ int main(void)
               case C2M_NOOP:
                   break;
         }
-        inbox_init(&doer_A.inbox);
-        inbox_init(&doer_B.inbox);
         dispatch_doer(&doer_A);
         dispatch_doer(&doer_B);
     }
