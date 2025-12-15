@@ -116,24 +116,28 @@ struct Doer{
     Inbox inbox;
     void (*handle)(Doer *self,const Message *msg);
 };
-static void g_doer_A_handle(Doer *self,const Message *msg)
+static void doer_A_handle(Doer *self,const Message *msg)
 {
     (void)self;
     printf("[A]:%s\n",msg->payload);
 }
-static void g_doer_B_handle(Doer *self,const Message *  msg)
+static void doer_B_handle(Doer *self,const Message *  msg)
 {
     (void)self;
     printf("[B]:%s\n",msg->payload);
 }
-static Doer g_doer_A={
-    .name="A",
-    .handle=g_doer_A_handle
-};
-static Doer g_doer_B={
-    .name="B",
-    .handle=g_doer_B_handle
-};
+static Doer g_doer_A;
+static Doer g_doer_B;
+static void runtime_init(void)
+{
+    g_doer_A.name="A";
+    g_doer_A.handle=doer_A_handle;
+    inbox_init(&g_doer_A.inbox);
+
+    g_doer_B.name="B";
+    g_doer_B.handle=doer_B_handle;
+    inbox_init(&g_doer_B.inbox);
+}
 static void route_message(const Message *msg)
 {
     switch(msg->to)
@@ -161,8 +165,7 @@ static void dispatch_doer(Doer *d)
 int main(void)
 {
     char line[1024];
-    inbox_init(&g_doer_A.inbox);
-    inbox_init(&g_doer_B.inbox);
+    runtime_init();
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
     {
         size_t len=strlen(line);
