@@ -4,6 +4,7 @@
 static unsigned long g_msg_created  = 0;
 static unsigned long g_msg_enqueued = 0;
 static unsigned long g_msg_handled  = 0;
+static unsigned long g_msg_dropped  = 0;
 
 static int g_msg_id=0;
 
@@ -149,27 +150,33 @@ static void runtime_init(void)
     g_doer_B.handle=doer_B_handle;
     inbox_init(&g_doer_B.inbox);
 }
-static void route_message(Message *msg)
+static void runtime_record_drop(const Message *m, Doer *d)
+{
+    g_msg_dropped++;
+}
+static void runtime_emit(const Message *src,Doer *d)
+{
+    Message m=*src;
+    g_msg_created++;
+    m.id=++g_msg_id;
+    if (inbox_push(&d->inbox, &m) != 0)
+    {
+        runtime_record_drop(&m, d);
+    }
+}
+static void route_message(const Message *msg)
 {
     switch(msg->to)
     {
         case TARGET_A:
-            g_msg_created++;
-            msg->id=++g_msg_id; 
-            inbox_push(&g_doer_A.inbox,msg);
+            runtime_emit(msg,&g_doer_A);
             break;
         case TARGET_B:
-            g_msg_created++;
-            msg->id=++g_msg_id;
-            inbox_push(&g_doer_B.inbox,msg);
+            runtime_emit(msg,&g_doer_B);
             break;
         case TARGET_BOTH:
-            g_msg_created++;
-            msg->id=++g_msg_id;
-            inbox_push(&g_doer_A.inbox,msg);
-            g_msg_created++;
-            msg->id=++g_msg_id;
-            inbox_push(&g_doer_B.inbox,msg);
+            runtime_emit(msg,&g_doer_A);
+            runtime_emit(msg,&g_doer_B);
             break;
     }
 }
@@ -225,9 +232,10 @@ static void runtime_print_message_balance(const DoerRegistry *reg)
     unsigned long pending = runtime_pending_messages(reg);
     long balance = (long)g_msg_created
                  - (long)g_msg_handled
+                 - (long)g_msg_dropped
                  - (long)pending;
-    printf("[MSG_BALANCE] created=%lu enqueued=%lu handled=%lu pending=%lu balance=%ld\n",
-       g_msg_created, g_msg_enqueued, g_msg_handled, pending, balance);
+    printf("[MSG_BALANCE] created=%lu enqueued=%lu handled=%lu dropped=%lu pending=%lu balance=%ld\n",
+       g_msg_created, g_msg_enqueued, g_msg_handled, g_msg_dropped,pending, balance);
 }
 static void scheduler_round(Scheduler *s)
 {
