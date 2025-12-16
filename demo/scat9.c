@@ -186,6 +186,7 @@ static void runtime_emit(const Message *src,Doer *d)
     Message m=*src;
     g_msg_created++;
     m.id=++g_msg_id;
+    m.cap=runtime_new_cap();
     if (inbox_push(&d->inbox, &m) != 0)
     {
         runtime_record_drop(&m, d);
