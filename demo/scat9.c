@@ -13,6 +13,8 @@
  * - threads
  * - locks
  * - time slicing
+ *
+ * Tick is not fundamental.Step is.
  */
 
 #include <stdio.h>
@@ -24,6 +26,7 @@ static unsigned long g_msg_handled  = 0;
 static unsigned long g_msg_dropped  = 0;
 
 static int g_msg_id=0;
+static int g_cap_id=0;
 
 typedef enum{
     CMD_SEND_A,
@@ -43,6 +46,7 @@ typedef enum{
 }Target;
 typedef struct{
     int id;
+    int cap;
     Target to;
     char *payload;
 }Message;
@@ -148,12 +152,12 @@ struct Doer{
 static void doer_A_handle(Doer *self,const Message *msg)
 {
     (void)self;
-    printf("msg %d [A]:%s\n",msg->id,msg->payload);
+    printf("msg %d cap %d [A]:%s\n",msg->id,msg->cap,msg->payload);
 }
 static void doer_B_handle(Doer *self,const Message *  msg)
 {
     (void)self;
-    printf("msg %d [B]:%s\n",msg->id,msg->payload);
+    printf("msg %d cap %d [B]:%s\n",msg->id,msg->cap,msg->payload);
 }
 static Doer g_doer_A;
 static Doer g_doer_B;
@@ -166,6 +170,10 @@ static void runtime_init(void)
     g_doer_B.name="B";
     g_doer_B.handle=doer_B_handle;
     inbox_init(&g_doer_B.inbox);
+}
+static int runtime_new_cap(void)
+{
+    return ++g_cap_id;
 }
 static void runtime_record_drop(const Message *m, Doer *d)
 {
