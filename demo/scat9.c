@@ -166,7 +166,7 @@ static void runtime_emit(const Message *src,Doer *d)
         runtime_record_drop(&m, d);
     }
 }
-static void route_message(const Message *msg)
+static void runtime_route(const Message *msg)
 {
     switch(msg->to)
     {
@@ -263,13 +263,13 @@ int main(void)
     registry_add(&reg,&g_doer_A);
     registry_add(&reg,&g_doer_B);
     Message m={.to=TARGET_BOTH,.payload="hi Tony."};
-    route_message(&m);
+    runtime_route(&m);
     Message m1={.to=TARGET_A,.payload="hi 大哥."};
     Message m2={.to=TARGET_B,.payload="hi 小弟."};
     Message m3={.to=TARGET_BOTH,.payload="both"};
-    route_message(&m1);
-    route_message(&m2);
-    route_message(&m3);
+    runtime_route(&m1);
+    runtime_route(&m2);
+    runtime_route(&m3);
     Scheduler sched={.reg=&reg};
     while(scheduler_has_work(&sched))
     {
@@ -290,7 +290,7 @@ int main(void)
         switch(r)
         {
               case C2M_OK:
-                  route_message(&msg);
+                  runtime_route(&msg);
                   break;
               case C2M_CTRL_EXIT:
                   return 0;
