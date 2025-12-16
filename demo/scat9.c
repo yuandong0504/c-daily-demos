@@ -162,6 +162,45 @@ static void dispatch_doer(Doer *d)
         d->handle(d,&msg);
     }
 }
+#define MAX_DOERS 8
+typedef struct{
+    Doer *list[MAX_DOERS];
+    int count;
+}DoerRegistry;
+static void registry_init(DoerRegistry *r)
+{
+    r->count=0;
+}
+static int registry_add(DoerRegistry *r,Doer *d)
+{
+    if(r->count>=MAX_DOERS) return -1;
+    r->list[r->count++]=d;
+    return 0;
+}
+typedef struct{
+    DoerRegistry *reg;
+}Scheduler;
+static int scheduler_has_work(const Scheduler *s)
+{
+    for(int i=0;i<s->reg->count;i++)
+    {
+        Doer *d=s->reg->list[i];
+        if(!inbox_empty(&d->inbox)){return 1;}
+    }
+    return 0;
+}
+static void scheduler_step(Scheduler *s)
+{
+    for(int i=0;i<s->reg->count;i++)
+    {
+        Doer *d=s->reg->list[i];
+        Message m;
+        if(inbox_pop(&d->inbox,&m)==0)
+        {
+            d->handle(d,&m);
+        }
+    }
+}
 int main(void)
 {
     char line[1024];
