@@ -148,17 +148,20 @@ static void runtime_init(void)
 }
 static void route_message(const Message *msg)
 {
-    g_msg_created++;
     switch(msg->to)
     {
         case TARGET_A:
+            g_msg_created++;
             inbox_push(&g_doer_A.inbox,msg);
             break;
         case TARGET_B:
+            g_msg_created++;
             inbox_push(&g_doer_B.inbox,msg);
             break;
         case TARGET_BOTH:
+            g_msg_created++;
             inbox_push(&g_doer_A.inbox,msg);
+            g_msg_created++;
             inbox_push(&g_doer_B.inbox,msg);
             break;
     }
@@ -216,9 +219,8 @@ static void runtime_print_message_balance(const DoerRegistry *reg)
     long balance = (long)g_msg_created
                  - (long)g_msg_handled
                  - (long)pending;
-
-    printf("[MSG_BALANCE] created=%lu handled=%lu pending=%lu balance=%ld\n",
-           g_msg_created, g_msg_handled, pending, balance);
+    printf("[MSG_BALANCE] created=%lu enqueued=%lu handled=%lu pending=%lu balance=%ld\n",
+       g_msg_created, g_msg_enqueued, g_msg_handled, pending, balance);
 }
 static void scheduler_round(Scheduler *s)
 {
