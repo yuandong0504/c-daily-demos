@@ -203,8 +203,24 @@ static void scheduler_step(Scheduler *s)
 }
 int main(void)
 {
-    char line[1024];
     runtime_init();
+    DoerRegistry reg;
+    registry_init(&reg);
+    registry_add(&reg,&g_doer_A);
+    registry_add(&reg,&g_doer_B);
+    Message m={.to=TARGET_BOTH,.payload="hi Tony."};
+    route_message(&m);
+    Message m1={.to=TARGET_A,.payload="hi 大哥."};
+    Message m2={.to=TARGET_BOTH,.payload="hi 小弟."};
+    route_message(&m1);
+    route_message(&m2);
+    Scheduler sched={.reg=&reg};
+    while(scheduler_has_work(&sched))
+    {
+        scheduler_step(&sched);
+        printf("Tony is watching.\n");
+    }
+    /**char line[1024];
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
     {
         size_t len=strlen(line);
@@ -227,7 +243,7 @@ int main(void)
         }
         dispatch_doer(&g_doer_A);
         dispatch_doer(&g_doer_B);
-    }
+    }**/
 
     return 0;
 }
