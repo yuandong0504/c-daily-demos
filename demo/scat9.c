@@ -153,6 +153,8 @@ static void runtime_init(void)
 static void runtime_record_drop(const Message *m, Doer *d)
 {
     g_msg_dropped++;
+    printf("[DROP] msg=%d to=%s payload='%s'\n",
+           m->id, d->name, m->payload);
 }
 static void runtime_emit(const Message *src,Doer *d)
 {
