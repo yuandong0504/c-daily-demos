@@ -5,6 +5,8 @@ static unsigned long g_msg_created  = 0;
 static unsigned long g_msg_enqueued = 0;
 static unsigned long g_msg_handled  = 0;
 
+static int g_msg_id=0;
+
 typedef enum{
     CMD_SEND_A,
     CMD_SEND_B,
@@ -22,6 +24,7 @@ typedef enum{
     TARGET_BOTH
 }Target;
 typedef struct{
+    int id;
     Target to;
     char *payload;
 }Message;
@@ -127,12 +130,12 @@ struct Doer{
 static void doer_A_handle(Doer *self,const Message *msg)
 {
     (void)self;
-    printf("[A]:%s\n",msg->payload);
+    printf("msg %d [A]:%s\n",msg->id,msg->payload);
 }
 static void doer_B_handle(Doer *self,const Message *  msg)
 {
     (void)self;
-    printf("[B]:%s\n",msg->payload);
+    printf("msg %d [B]:%s\n",msg->id,msg->payload);
 }
 static Doer g_doer_A;
 static Doer g_doer_B;
@@ -146,22 +149,26 @@ static void runtime_init(void)
     g_doer_B.handle=doer_B_handle;
     inbox_init(&g_doer_B.inbox);
 }
-static void route_message(const Message *msg)
+static void route_message(Message *msg)
 {
     switch(msg->to)
     {
         case TARGET_A:
             g_msg_created++;
+            msg->id=++g_msg_id; 
             inbox_push(&g_doer_A.inbox,msg);
             break;
         case TARGET_B:
             g_msg_created++;
+            msg->id=++g_msg_id;
             inbox_push(&g_doer_B.inbox,msg);
             break;
         case TARGET_BOTH:
             g_msg_created++;
+            msg->id=++g_msg_id;
             inbox_push(&g_doer_A.inbox,msg);
             g_msg_created++;
+            msg->id=++g_msg_id;
             inbox_push(&g_doer_B.inbox,msg);
             break;
     }
@@ -249,8 +256,10 @@ int main(void)
     route_message(&m);
     Message m1={.to=TARGET_A,.payload="hi 大哥."};
     Message m2={.to=TARGET_B,.payload="hi 小弟."};
+    Message m3={.to=TARGET_BOTH,.payload="both"};
     route_message(&m1);
     route_message(&m2);
+    route_message(&m3);
     Scheduler sched={.reg=&reg};
     while(scheduler_has_work(&sched))
     {
