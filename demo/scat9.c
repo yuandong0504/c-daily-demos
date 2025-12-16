@@ -66,17 +66,17 @@ C2MResult command_to_message(Command *cmd,Message *msg)
         case CMD_SEND_A:
             msg->to=TARGET_A;
             msg->payload=cmd->text;
-            g_msg_created++;
+            //g_msg_created++;
             return C2M_OK;
         case CMD_SEND_B:
             msg->to=TARGET_B;
             msg->payload=cmd->text;
-            g_msg_created++;
+            //g_msg_created++;
             return C2M_OK;
         case CMD_SEND_BOTH:
             msg->to=TARGET_BOTH;
             msg->payload=cmd->text;
-            g_msg_created++;
+            //g_msg_created++;
             return C2M_OK;
         case CMD_EXIT:
             return C2M_CTRL_EXIT;
@@ -148,6 +148,7 @@ static void runtime_init(void)
 }
 static void route_message(const Message *msg)
 {
+    g_msg_created++;
     switch(msg->to)
     {
         case TARGET_A:
