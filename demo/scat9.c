@@ -189,7 +189,7 @@ static int scheduler_has_work(const Scheduler *s)
     }
     return 0;
 }
-static void scheduler_step(Scheduler *s)
+static void scheduler_round(Scheduler *s)
 {
     for(int i=0;i<s->reg->count;i++)
     {
@@ -198,6 +198,7 @@ static void scheduler_step(Scheduler *s)
         if(inbox_pop(&d->inbox,&m)==0)
         {
             d->handle(d,&m);
+            printf("Tony is watching.\n");
         }
     }
 }
@@ -211,14 +212,13 @@ int main(void)
     Message m={.to=TARGET_BOTH,.payload="hi Tony."};
     route_message(&m);
     Message m1={.to=TARGET_A,.payload="hi 大哥."};
-    Message m2={.to=TARGET_BOTH,.payload="hi 小弟."};
+    Message m2={.to=TARGET_B,.payload="hi 小弟."};
     route_message(&m1);
     route_message(&m2);
     Scheduler sched={.reg=&reg};
     while(scheduler_has_work(&sched))
     {
-        scheduler_step(&sched);
-        printf("Tony is watching.\n");
+        scheduler_round(&sched);
     }
     /**char line[1024];
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
