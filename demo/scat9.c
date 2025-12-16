@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+static unsigned long g_msg_created  = 0;
+static unsigned long g_msg_enqueued = 0;
+static unsigned long g_msg_handled  = 0;
+
 typedef enum{
     CMD_SEND_A,
     CMD_SEND_B,
@@ -62,14 +66,17 @@ C2MResult command_to_message(Command *cmd,Message *msg)
         case CMD_SEND_A:
             msg->to=TARGET_A;
             msg->payload=cmd->text;
+            g_msg_created++;
             return C2M_OK;
         case CMD_SEND_B:
             msg->to=TARGET_B;
             msg->payload=cmd->text;
+            g_msg_created++;
             return C2M_OK;
         case CMD_SEND_BOTH:
             msg->to=TARGET_BOTH;
             msg->payload=cmd->text;
+            g_msg_created++;
             return C2M_OK;
         case CMD_EXIT:
             return C2M_CTRL_EXIT;
@@ -101,6 +108,7 @@ static int inbox_push(Inbox *q,const Message *m)
     if(inbox_full(q)) return -1;
     q->msgs[q->tail]=*m;
     q->tail=((q->tail+1)%INBOX_CAP);
+    g_msg_enqueued++;
     return 0;
 }
 static int inbox_pop(Inbox *q,Message *out)
@@ -189,6 +197,28 @@ static int scheduler_has_work(const Scheduler *s)
     }
     return 0;
 }
+static unsigned long runtime_pending_messages(const DoerRegistry *reg)
+{
+    unsigned long n = 0;
+    for (int i = 0; i < reg->count; i++) {
+        Inbox *q = &reg->list[i]->inbox;
+        if (q->tail >= q->head)
+            n += (q->tail - q->head);
+        else
+            n += (INBOX_CAP - q->head + q->tail);
+    }
+    return n;
+}
+static void runtime_print_message_balance(const DoerRegistry *reg)
+{
+    unsigned long pending = runtime_pending_messages(reg);
+    long balance = (long)g_msg_created
+                 - (long)g_msg_handled
+                 - (long)pending;
+
+    printf("[MSG_BALANCE] created=%lu handled=%lu pending=%lu balance=%ld\n",
+           g_msg_created, g_msg_handled, pending, balance);
+}
 static void scheduler_round(Scheduler *s)
 {
     for(int i=0;i<s->reg->count;i++)
@@ -198,12 +228,15 @@ static void scheduler_round(Scheduler *s)
         if(inbox_pop(&d->inbox,&m)==0)
         {
             d->handle(d,&m);
-            printf("Tony is watching.\n");
+            g_msg_handled++;
         }
     }
 }
 int main(void)
 {
+    // TODO(runtime):
+    // inbox_push / inbox_pop / route_message
+    // must be owned by runtime layer
     runtime_init();
     DoerRegistry reg;
     registry_init(&reg);
@@ -220,6 +253,7 @@ int main(void)
     {
         scheduler_round(&sched);
     }
+    runtime_print_message_balance(&reg);
     /**char line[1024];
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
     {
