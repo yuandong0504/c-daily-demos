@@ -1,3 +1,20 @@
+/*
+ * Runtime v0.1
+ *
+ * Design invariants:
+ * 1. All Message creation happens in runtime_emit
+ * 2. Every Message is either:
+ *    - handled
+ *    - pending
+ *    - dropped
+ * 3. Message balance must close to zero
+ *
+ * This file intentionally avoids:
+ * - threads
+ * - locks
+ * - time slicing
+ */
+
 #include <stdio.h>
 #include <string.h>
 
