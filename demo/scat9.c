@@ -16,7 +16,12 @@
  *
  * Tick is not fundamental.Step is.
  */
-
+/*
+ * NOTE:
+ * Capability minting is temporarily externalized
+ * to observe capability flow and enforcement behavior.
+ * This will be sealed in a later phase.
+ */
 #include <stdio.h>
 #include <string.h>
 
@@ -185,7 +190,7 @@ static void runtime_init(void)
 // Responsible for creating unique message/capability identities.
 static int mint_new_cap(void)
 {
-    return +mint_cap_id;
+    return ++mint_cap_id;
 }
 // === VALIDATE ===
 // Determines whether a minted capability is usable by a given doer.
@@ -202,8 +207,12 @@ static int validate_capability(int cap,const CapabilitySet *set)
 static void runtime_record_drop(const Message *m, Doer *d)
 {
     g_msg_dropped++;
-    printf("[DROP] msg=%d to=%s payload='%s'\n",
-           m->id, d->name, m->payload);
+    printf(
+    "[DROP] msg=%d cap=%d to=%s payload=\"%s\"\n",
+    m->id,
+    m->cap,
+    d->name,
+    m->payload ? m->payload : "");
 }
 // === RUNTIME ===
 // Executes already-validated actions.
