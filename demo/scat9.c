@@ -50,6 +50,10 @@ typedef struct{
     Target to;
     char *payload;
 }Message;
+typedef struct{
+    int allowed_caps[4];
+    int cap_count;
+}CapbilitySet;
 static Command parse_command(char *line)
 {
     Command cmd={.type=CMD_UNKNOWN,.text=NULL};
@@ -147,6 +151,7 @@ typedef struct Doer Doer;
 struct Doer{
     const char *name;
     Inbox inbox;
+    CapbilitySet caps;
     void (*handle)(Doer *self,const Message *msg);
 };
 static void doer_A_handle(Doer *self,const Message *msg)
@@ -166,14 +171,27 @@ static void runtime_init(void)
     g_doer_A.name="A";
     g_doer_A.handle=doer_A_handle;
     inbox_init(&g_doer_A.inbox);
+    g_doer_A.caps.allowed_caps[0]=1;
+    g_doer_A.caps.cap_count=1;
 
     g_doer_B.name="B";
     g_doer_B.handle=doer_B_handle;
     inbox_init(&g_doer_B.inbox);
+    g_doer_B.caps.allowed_caps[0]=2;
+    g_doer_B.caps.cap_count=1;
 }
 static int runtime_new_cap(void)
 {
     return ++g_cap_id;
+}
+static int runtime_check_cap(int cap,const CapbilitySet *set)
+{
+    for(int i=0;i<set->cap_count;i++)
+    {
+        if(set->allowed_caps[i]==cap) 
+            return 1;
+    }
+    return 0;
 }
 static void runtime_record_drop(const Message *m, Doer *d)
 {
@@ -187,7 +205,11 @@ static void runtime_emit(const Message *src,Doer *d)
     g_msg_created++;
     m.id=++g_msg_id;
     m.cap=runtime_new_cap();
-    if (inbox_push(&d->inbox, &m) != 0)
+    if(!runtime_check_cap(m.cap,&d->caps))
+    {
+        runtime_record_drop(&m, d);
+    }
+    else if (inbox_push(&d->inbox, &m) != 0)
     {
         runtime_record_drop(&m, d);
     }
