@@ -204,7 +204,6 @@ static void runtime_emit(const Message *src,Doer *d)
     Message m=*src;
     g_msg_created++;
     m.id=++g_msg_id;
-    m.cap=runtime_new_cap();
     if(!runtime_check_cap(m.cap,&d->caps))
     {
         runtime_record_drop(&m, d);
@@ -310,11 +309,11 @@ int main(void)
     registry_init(&reg);
     registry_add(&reg,&g_doer_A);
     registry_add(&reg,&g_doer_B);
-    Message m={.to=TARGET_BOTH,.payload="hi Tony."};
+    Message m={.to=TARGET_BOTH,.cap=1,.payload="hi Tony."};
     runtime_route(&m);
-    Message m1={.to=TARGET_A,.payload="hi 大哥."};
-    Message m2={.to=TARGET_B,.payload="hi 小弟."};
-    Message m3={.to=TARGET_BOTH,.payload="both"};
+    Message m1={.to=TARGET_A,.cap=1,.payload="hi 大哥."};
+    Message m2={.to=TARGET_B,.cap=2,.payload="hi 小弟."};
+    Message m3={.to=TARGET_BOTH,.cap=2,.payload="both"};
     runtime_route(&m1);
     runtime_route(&m2);
     runtime_route(&m3);
