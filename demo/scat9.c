@@ -160,31 +160,32 @@ struct Doer{
     CapabilitySet caps;
     void (*handle)(Doer *self,const Message *msg);
 };
-static void doer_A_handle(Doer *self,const Message *msg)
+static void doer_a_handle(Doer *self,const Message *msg)
 {
     (void)self;
     printf("msg %d cap %d [A]:%s\n",msg->id,msg->cap,msg->payload);
 }
-static void doer_B_handle(Doer *self,const Message *  msg)
+static void doer_b_handle(Doer *self,const Message *  msg)
 {
     (void)self;
     printf("msg %d cap %d [B]:%s\n",msg->id,msg->cap,msg->payload);
 }
-static Doer g_doer_A;
-static Doer g_doer_B;
+static Doer g_doer_a;
+static Doer g_doer_b;
+static Doer g_doer_observer;
 static void runtime_init(void)
 {
-    g_doer_A.name="A";
-    g_doer_A.handle=doer_A_handle;
-    inbox_init(&g_doer_A.inbox);
-    g_doer_A.caps.allowed_caps[0]=1;
-    g_doer_A.caps.cap_count=1;
+    g_doer_a.name="A";
+    g_doer_a.handle=doer_a_handle;
+    inbox_init(&g_doer_a.inbox);
+    g_doer_a.caps.allowed_caps[0]=1;
+    g_doer_a.caps.cap_count=1;
 
-    g_doer_B.name="B";
-    g_doer_B.handle=doer_B_handle;
-    inbox_init(&g_doer_B.inbox);
-    g_doer_B.caps.allowed_caps[0]=2;
-    g_doer_B.caps.cap_count=1;
+    g_doer_b.name="B";
+    g_doer_b.handle=doer_b_handle;
+    inbox_init(&g_doer_b.inbox);
+    g_doer_b.caps.allowed_caps[0]=2;
+    g_doer_b.caps.cap_count=1;
 }
 // === MINT ===
 // Responsible for creating unique message/capability identities.
@@ -239,14 +240,14 @@ static void runtime_route(const Message *msg)
     switch(msg->to)
     {
         case TARGET_A:
-            runtime_emit(msg,&g_doer_A);
+            runtime_emit(msg,&g_doer_a);
             break;
         case TARGET_B:
-            runtime_emit(msg,&g_doer_B);
+            runtime_emit(msg,&g_doer_b);
             break;
         case TARGET_BOTH:
-            runtime_emit(msg,&g_doer_A);
-            runtime_emit(msg,&g_doer_B);
+            runtime_emit(msg,&g_doer_a);
+            runtime_emit(msg,&g_doer_b);
             break;
     }
 }
@@ -331,8 +332,8 @@ int main(void)
     runtime_init();
     DoerRegistry reg;
     registry_init(&reg);
-    registry_add(&reg,&g_doer_A);
-    registry_add(&reg,&g_doer_B);
+    registry_add(&reg,&g_doer_a);
+    registry_add(&reg,&g_doer_b);
     Message m={.to=TARGET_BOTH,.cap=1,.payload="hi Tony."};
     runtime_route(&m);
     Message m1={.to=TARGET_A,.cap=1,.payload="hi 大哥."};
@@ -368,8 +369,8 @@ int main(void)
               case C2M_NOOP:
                   break;
         }
-        dispatch_doer(&g_doer_A);
-        dispatch_doer(&g_doer_B);
+        dispatch_doer(&g_doer_a);
+        dispatch_doer(&g_doer_b);
     }**/
 
     return 0;
