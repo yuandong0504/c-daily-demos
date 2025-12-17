@@ -24,9 +24,10 @@ static unsigned long g_msg_created  = 0;
 static unsigned long g_msg_enqueued = 0;
 static unsigned long g_msg_handled  = 0;
 static unsigned long g_msg_dropped  = 0;
-
-static int g_msg_id=0;
-static int g_cap_id=0;
+// === MINT ===
+// Responsible for creating unique message/capability identities.
+static int mint_msg_id=0;
+static int mint_cap_id=0;
 
 typedef enum{
     CMD_SEND_A,
@@ -53,7 +54,7 @@ typedef struct{
 typedef struct{
     int allowed_caps[4];
     int cap_count;
-}CapbilitySet;
+}CapabilitySet;
 static Command parse_command(char *line)
 {
     Command cmd={.type=CMD_UNKNOWN,.text=NULL};
@@ -151,7 +152,7 @@ typedef struct Doer Doer;
 struct Doer{
     const char *name;
     Inbox inbox;
-    CapbilitySet caps;
+    CapabilitySet caps;
     void (*handle)(Doer *self,const Message *msg);
 };
 static void doer_A_handle(Doer *self,const Message *msg)
@@ -180,11 +181,16 @@ static void runtime_init(void)
     g_doer_B.caps.allowed_caps[0]=2;
     g_doer_B.caps.cap_count=1;
 }
-static int runtime_new_cap(void)
+// === MINT ===
+// Responsible for creating unique message/capability identities.
+static int mint_new_cap(void)
 {
-    return ++g_cap_id;
+    return +mint_cap_id;
 }
-static int runtime_check_cap(int cap,const CapbilitySet *set)
+// === VALIDATE ===
+// Determines whether a minted capability is usable by a given doer.
+// Returns boolean only. No side effects.
+static int validate_capability(int cap,const CapabilitySet *set)
 {
     for(int i=0;i<set->cap_count;i++)
     {
@@ -199,12 +205,15 @@ static void runtime_record_drop(const Message *m, Doer *d)
     printf("[DROP] msg=%d to=%s payload='%s'\n",
            m->id, d->name, m->payload);
 }
+// === RUNTIME ===
+// Executes already-validated actions.
+// Does NOT perform permission checks.
 static void runtime_emit(const Message *src,Doer *d)
 {
     Message m=*src;
     g_msg_created++;
-    m.id=++g_msg_id;
-    if(!runtime_check_cap(m.cap,&d->caps))
+    m.id=++mint_msg_id;
+    if(!validate_capability(m.cap,&d->caps))
     {
         runtime_record_drop(&m, d);
     }
@@ -213,6 +222,9 @@ static void runtime_emit(const Message *src,Doer *d)
         runtime_record_drop(&m, d);
     }
 }
+// === RUNTIME ===
+// Executes already-validated actions.
+// Does NOT perform permission checks.
 static void runtime_route(const Message *msg)
 {
     switch(msg->to)
@@ -286,6 +298,9 @@ static void runtime_print_message_balance(const DoerRegistry *reg)
     printf("[MSG_BALANCE] created=%lu enqueued=%lu handled=%lu dropped=%lu pending=%lu balance=%ld\n",
        g_msg_created, g_msg_enqueued, g_msg_handled, g_msg_dropped,pending, balance);
 }
+// === RUNTIME ===
+// Executes already-validated actions.
+// Does NOT perform permission checks.
 static void scheduler_round(Scheduler *s)
 {
     for(int i=0;i<s->reg->count;i++)
