@@ -50,9 +50,14 @@ typedef enum{
     TARGET_B,
     TARGET_BOTH
 }Target;
+typedef enum{
+    MSGK_APP,
+    MSGK_STDIN_LINE
+}MessageKind;
 typedef struct{
     int id;
     int cap;
+    MessageKind kind;
     Target to;
     char *payload;
 }Message;
@@ -163,6 +168,10 @@ struct Doer{
 static void doer_a_handle(Doer *self,const Message *msg)
 {
     (void)self;
+    if(msg->kind==MSGK_STDIN_LINE)
+    {
+        printf("[A]:message from stdin\n");
+    }
     printf("msg %d cap %d [A]:%s\n",msg->id,msg->cap,msg->payload);
 }
 static void doer_b_handle(Doer *self,const Message *  msg)
@@ -323,14 +332,25 @@ static void scheduler_round(Scheduler *s)
         }
     }
 }
+// External world → CMR boundary
+// Raw events must be converted into Messages before entering runtime.
 static void emit_stdin_event(void)
 {
     char buf[1024];
     fgets(buf,sizeof(buf),stdin);
+    size_t n=strlen(buf);
+    if(n>0&&buf[n-1]=='\n')
+    {
+        buf[n-1]='\0';
+    }
+    char *p=buf;
+    while(*p==' '||*p=='\t') p++;
+    if(*p=='\0') return;
     Message msg={
         .to=TARGET_A,
+        .kind=MSGK_STDIN_LINE,
         .cap=1,
-        .payload=buf
+        .payload=p
     };
     runtime_route(&msg);
 }
@@ -357,12 +377,15 @@ int main(void)
     {
         scheduler_round(&sched);
     }
-    runtime_print_message_balance(&reg);
 **/
     for(;;)
     {
         emit_stdin_event();
-        scheduler_round(&sched);
+        while(scheduler_has_work(&sched))
+        {
+            scheduler_round(&sched);
+        }
+        runtime_print_message_balance(&reg);
     }
     /**char line[1024];
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
