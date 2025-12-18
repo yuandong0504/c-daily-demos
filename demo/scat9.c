@@ -172,7 +172,6 @@ static void doer_b_handle(Doer *self,const Message *  msg)
 }
 static Doer g_doer_a;
 static Doer g_doer_b;
-static Doer g_doer_observer;
 static void runtime_init(void)
 {
     g_doer_a.name="A";
@@ -324,6 +323,17 @@ static void scheduler_round(Scheduler *s)
         }
     }
 }
+static void emit_stdin_event(void)
+{
+    char buf[1024];
+    fgets(buf,sizeof(buf),stdin);
+    Message msg={
+        .to=TARGET_A,
+        .cap=1,
+        .payload=buf
+    };
+    runtime_route(&msg);
+}
 int main(void)
 {
     // TODO(runtime):
@@ -343,11 +353,17 @@ int main(void)
     runtime_route(&m2);
     runtime_route(&m3);
     Scheduler sched={.reg=&reg};
-    while(scheduler_has_work(&sched))
+/**    while(scheduler_has_work(&sched))
     {
         scheduler_round(&sched);
     }
     runtime_print_message_balance(&reg);
+**/
+    for(;;)
+    {
+        emit_stdin_event();
+        scheduler_round(&sched);
+    }
     /**char line[1024];
     while(printf(">>>"),fflush(stdout),fgets(line,sizeof(line),stdin))
     {
@@ -369,8 +385,6 @@ int main(void)
               case C2M_NOOP:
                   break;
         }
-        dispatch_doer(&g_doer_a);
-        dispatch_doer(&g_doer_b);
     }**/
 
     return 0;
