@@ -326,16 +326,9 @@ static void scheduler_round(Scheduler *s)
 }
 // External world → CMR boundary
 // Raw events must be converted into Messages before entering runtime.
-static void emit_stdin_event(void)
+static void emit_stdin_line_message(char *line)
 {
-    char buf[1024];
-    fgets(buf,sizeof(buf),stdin);
-    size_t n=strlen(buf);
-    if(n>0&&buf[n-1]=='\n')
-    {
-        buf[n-1]='\0';
-    }
-    char *p=buf;
+    char *p=line;
     while(*p==' '||*p=='\t') p++;
     if(*p=='\0') return;
     Message msg={
@@ -345,6 +338,17 @@ static void emit_stdin_event(void)
         .payload=p
     };
     runtime_route(&msg);
+}
+static void emit_stdin_event(void)
+{
+    char buf[1024];
+    fgets(buf,sizeof(buf),stdin);
+    size_t n=strlen(buf);
+    if(n>0&&buf[n-1]=='\n')
+    {
+        buf[n-1]='\0';
+    }
+    emit_stdin_line_message(buf);
 }
 int main(void)
 {
