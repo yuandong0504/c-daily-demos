@@ -19,14 +19,25 @@
 #include <unistd.h>
 #include <liburing.h>
 #include <errno.h>
+#include <string.h>
+#include <signal.h>
 
 static unsigned long g_msg_created  = 0;
 static unsigned long g_msg_handled  = 0;
 static unsigned long g_msg_dropped  = 0;
+
+static struct io_uring g_ring;
+static char g_stdin_buf[1024];
+
+static int g_running=1;
 // === MINT ===
 // Responsible for creating unique message/capability identities.
 static int mint_msg_id=0;
 static int mint_cap_id=0;
+
+#define USE_CURRENT_OFFSET (-1)
+#define FILE_OFFSET_START (0)
+#define NO_FLAGS (0)
 
 typedef enum{
     CMD_SEND_A,
@@ -342,6 +353,9 @@ static void emit_stdin_line_message(char *line)
 }
 static void emit_stdin_event(void)
 {
+    struct io_uring_sqe *sqe;
+    struct io_uring_cqe *cqe;
+
     char buf[1024];
     fgets(buf,sizeof(buf),stdin);
     size_t n=strlen(buf);
@@ -351,9 +365,24 @@ static void emit_stdin_event(void)
     }
     emit_stdin_line_message(buf);
 }
+static void on_sigint(int signo)
+{
+    (void)signo;
+    g_running=0;
+}
 int main(void)
 {
     printf("=== SCAT12: io_uring minimal ===\n");
+    signal(SIGINT,on_sigint);
+
+    int ret;
+    ret=io_uring_queue_init(8,&g_ring,NO_FLAGS);
+    if(ret<0)
+    {
+        fprintf(stderr,"io_uring_queue_init failed:%s\n",strerror(-ret));
+        return 1;  
+    }
+
     runtime_init();
     DoerRegistry reg;
     registry_init(&reg);
@@ -368,7 +397,7 @@ int main(void)
     runtime_route(&m2);
     runtime_route(&m3);
     Scheduler sched={.reg=&reg};
-    for(;;)
+    while(g_running)
     {
         emit_stdin_event();
         while(scheduler_has_work(&sched))
@@ -378,5 +407,7 @@ int main(void)
         runtime_print_message_balance(&reg);
     }
     
+    io_uring_queue_exit(&g_ring);
+    printf("io_uring is cleaned.\n");
     return 0;
 }
