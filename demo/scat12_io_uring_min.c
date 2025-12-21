@@ -16,9 +16,11 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <liburing.h>
+#include <errno.h>
 
 static unsigned long g_msg_created  = 0;
-static unsigned long g_msg_enqueued = 0;
 static unsigned long g_msg_handled  = 0;
 static unsigned long g_msg_dropped  = 0;
 // === MINT ===
@@ -140,7 +142,6 @@ static int inbox_push(Inbox *q,const Message *m)
     if(inbox_full(q)) return -1;
     q->msgs[q->tail]=*m;
     q->tail=((q->tail+1)%INBOX_CAP);
-    g_msg_enqueued++;
     return 0;
 }
 static int inbox_pop(Inbox *q,Message *out)
@@ -305,8 +306,8 @@ static void runtime_print_message_balance(const DoerRegistry *reg)
                  - (long)g_msg_handled
                  - (long)g_msg_dropped
                  - (long)pending;
-    printf("[MSG_BALANCE] created=%lu enqueued=%lu handled=%lu dropped=%lu pending=%lu balance=%ld\n",
-       g_msg_created, g_msg_enqueued, g_msg_handled, g_msg_dropped,pending, balance);
+    printf("[MSG_BALANCE] created=%lu handled=%lu dropped=%lu pending=%lu balance=%ld\n",
+       g_msg_created, g_msg_handled, g_msg_dropped,pending, balance);
 }
 // === RUNTIME ===
 // Executes already-validated actions.
