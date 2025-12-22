@@ -356,14 +356,36 @@ static void emit_stdin_event(void)
     struct io_uring_sqe *sqe;
     struct io_uring_cqe *cqe;
 
-    char buf[1024];
-    fgets(buf,sizeof(buf),stdin);
-    size_t n=strlen(buf);
-    if(n>0&&buf[n-1]=='\n')
+    sqe=io_uring_get_sqe(&g_ring);
+    io_uring_prep_read(sqe,STDIN_FILENO,g_stdin_buf,sizeof(g_stdin_buf)-1,FILE_OFFSET_START);
+    io_uring_submit(&g_ring);
+    int ret=io_uring_wait_cqe(&g_ring,&cqe);
+    if(ret<0)
     {
-        buf[n-1]='\0';
+        fprintf(stderr,"io_uring_wait_cqe failed:%s\n",strerror(-ret));
+        g_running=0;
+        return;
     }
-    emit_stdin_line_message(buf);
+    int res=cqe->res;
+    if(res==0)
+    {
+        printf("EOF,exit.\n");
+        g_running=0;
+        return;
+    }
+    if(res<0)
+    {
+        fprintf(stderr,"io_uring_wait_cqe failed:    %s\n",strerror(-res));
+        g_running=0;
+        return;
+    }
+    io_uring_cqe_seen(&g_ring,cqe);    
+    size_t n=strlen(g_stdin_buf);
+    if(n>0&&g_stdin_buf[n-1]=='\n')
+    {
+        g_stdin_buf[n-1]='\0';
+    }
+    emit_stdin_line_message(g_stdin_buf);
 }
 static void on_sigint(int signo)
 {
