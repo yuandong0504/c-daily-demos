@@ -366,6 +366,7 @@ static void emit_stdin_event(void)
         return; 
     }
     int ret=io_uring_wait_cqe(&g_ring,&cqe);
+    if(ret==-EINTR){return;}
     if(ret<0)
     {
         fprintf(stderr,"io_uring_wait_cqe failed:%s\n",strerror(-ret));
