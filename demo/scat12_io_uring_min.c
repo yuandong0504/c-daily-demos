@@ -358,7 +358,13 @@ static void emit_stdin_event(void)
 
     sqe=io_uring_get_sqe(&g_ring);
     io_uring_prep_read(sqe,STDIN_FILENO,g_stdin_buf,sizeof(g_stdin_buf)-1,FILE_OFFSET_START);
-    io_uring_submit(&g_ring);
+    int sret = io_uring_submit(&g_ring);
+    if (sret < 0) 
+    { 
+        fprintf(stderr, "submit: %s\n", strerror(-sret)); 
+        g_running=0; 
+        return; 
+    }
     int ret=io_uring_wait_cqe(&g_ring,&cqe);
     if(ret<0)
     {
@@ -367,6 +373,7 @@ static void emit_stdin_event(void)
         return;
     }
     int res=cqe->res;
+    io_uring_cqe_seen(&g_ring,cqe);
     if(res==0)
     {
         printf("EOF,exit.\n");
@@ -379,11 +386,9 @@ static void emit_stdin_event(void)
         g_running=0;
         return;
     }
-    io_uring_cqe_seen(&g_ring,cqe);    
-    size_t n=strlen(g_stdin_buf);
-    if(n>0&&g_stdin_buf[n-1]=='\n')
+    if(res>0&&g_stdin_buf[res-1]=='\n')
     {
-        g_stdin_buf[n-1]='\0';
+        g_stdin_buf[res-1]='\0';
     }
     emit_stdin_line_message(g_stdin_buf);
 }
