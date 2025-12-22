@@ -382,10 +382,11 @@ static void emit_stdin_event(void)
     }
     if(res<0)
     {
-        fprintf(stderr,"io_uring_wait_cqe failed:    %s\n",strerror(-res));
+        fprintf(stderr,"read failed:%s\n",strerror(-res));
         g_running=0;
         return;
     }
+    g_stdin_buf[res] = '\0';
     if(res>0&&g_stdin_buf[res-1]=='\n')
     {
         g_stdin_buf[res-1]='\0';
