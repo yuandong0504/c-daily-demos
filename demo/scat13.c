@@ -264,7 +264,6 @@ static void runtime_emit(const Message *src,Doer *d)
     Message m=*src;
     g_msg_created++;
     m.id=++mint_msg_id;
-    m.trace_id=++mint_trace_id;
     record_edge(m.trace_id,m.id,"runtime",d->name);
     if(!validate_capability(m.cap,&d->caps))
     {
@@ -452,7 +451,7 @@ static void dump_trace(trace_id_t trace_id)
 }
 int main(void)
 {
-    printf("=== SCAT12: io_uring minimal ===\n");
+    printf("=== SCAT13: Message Topology Exposure ===\n");
     signal(SIGINT,on_sigint);
 
     int ret;
@@ -468,11 +467,11 @@ int main(void)
     registry_init(&reg);
     registry_add(&reg,&g_doer_a);
     registry_add(&reg,&g_doer_b);
-    Message m={.to=TARGET_BOTH,.cap=1,.payload="hi Tony."};
+    Message m={.to=TARGET_BOTH,.trace_id=++          mint_trace_id,.cap=1,.payload="hi Tony."};
     runtime_route(&m);
-    Message m1={.to=TARGET_A,.cap=1,.payload="hi 大哥."};
-    Message m2={.to=TARGET_B,.cap=2,.payload="hi 小弟."};
-    Message m3={.to=TARGET_BOTH,.cap=2,.payload="both"};
+    Message m1={.to=TARGET_A,.trace_id=++mint_trace_id,.cap=1,.payload="hi Bean."};
+    Message m2={.to=TARGET_B,.trace_id=++            mint_trace_id,.cap=2,.payload="hi Alex."};
+    Message m3={.to=TARGET_BOTH,.trace_id=++          mint_trace_id,.cap=2,.payload="yea all"};
     runtime_route(&m1);
     runtime_route(&m2);
     runtime_route(&m3);
