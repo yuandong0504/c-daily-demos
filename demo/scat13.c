@@ -384,10 +384,9 @@ static void emit_stdin_line_message(char *line)
         .to=TARGET_A,
         .kind=MSGK_STDIN_LINE,
         .cap=1,
-        .trace_id=++mint_trace_id,
         .payload=p
     };
-    record_edge(msg.trace_id,0,"WORLD","stdin");
+    record_edge(msg.trace_id,msg.id,"WORLD","stdin");
     runtime_route(&msg);
 }
 static void emit_stdin_event(void)
