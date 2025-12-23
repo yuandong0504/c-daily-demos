@@ -21,6 +21,8 @@
 #include <errno.h>
 #include <string.h>
 #include <signal.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 typedef uint64_t cap_id_t;
 typedef uint64_t msg_id_t;
@@ -71,7 +73,7 @@ typedef struct{
     char *payload;
 }Message;
 typedef struct{
-    int allowed_caps[4];
+    cap_id_t allowed_caps[4];
     int cap_count;
 }CapabilitySet;
 static Command parse_command(char *line)
@@ -212,7 +214,7 @@ static cap_id_t mint_new_cap(void)
 // === VALIDATE ===
 // Determines whether a minted capability is usable by a given doer.
 // Returns boolean only. No side effects.
-static int validate_capability(int cap,const CapabilitySet *set)
+static int validate_capability(cap_id_t cap,const CapabilitySet *set)
 {
     for(int i=0;i<set->cap_count;i++)
     {
