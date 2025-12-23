@@ -39,6 +39,7 @@ static int g_edge_count=0;
 // Responsible for creating unique message/capability identities.
 static msg_id_t mint_msg_id=0;
 static cap_id_t mint_cap_id=0;
+static trace_id_t mint_trace_id=0;
 
 #define USE_CURRENT_OFFSET (-1)
 #define FILE_OFFSET_START (0)
@@ -246,6 +247,7 @@ static int validate_capability(cap_id_t cap,const CapabilitySet *set)
 }
 static void runtime_record_drop(const Message *m, Doer *d)
 {
+    record_edge(m->trace_id,m->id,d->name,"dropped");
     g_msg_dropped++;
     printf(
     "[DROP] msg=%"PRIu64" cap=%"PRIu64" to=%s payload=\"%s\"\n",
@@ -262,6 +264,7 @@ static void runtime_emit(const Message *src,Doer *d)
     Message m=*src;
     g_msg_created++;
     m.id=++mint_msg_id;
+    m.trace_id=++mint_trace_id;
     record_edge(m.trace_id,m.id,"runtime",d->name);
     if(!validate_capability(m.cap,&d->caps))
     {
@@ -370,7 +373,6 @@ static void scheduler_round(Scheduler *s)
 }
 // External world → CMR boundary
 // Raw events must be converted into Messages before entering runtime.
-static trace_id_t trace_id_mint=0;
 static void emit_stdin_line_message(char *line)
 {
     char *p=line;
@@ -380,7 +382,7 @@ static void emit_stdin_line_message(char *line)
         .to=TARGET_A,
         .kind=MSGK_STDIN_LINE,
         .cap=1,
-        .trace_id=++trace_id_mint,
+        .trace_id=++mint_trace_id,
         .payload=p
     };
     record_edge(msg.trace_id,0,"WORLD","stdin");
@@ -436,7 +438,7 @@ static void on_sigint(int signo)
 }
 static void dump_trace(trace_id_t trace_id)
 {
-    printf("info of trace_id %"PRIu64":\n",trace_id);
+    printf("\n");
     for(int i=0;i<g_edge_count;i++)
     {
         if(g_edges[i].trace_id==trace_id)
@@ -487,6 +489,6 @@ int main(void)
     
     io_uring_queue_exit(&g_ring);
     printf("io_uring is cleaned.\n");
-    dump_trace(1);
+    for(int i=0;i<mint_trace_id;i++)dump_trace(i+1); 
     return 0;
 }
