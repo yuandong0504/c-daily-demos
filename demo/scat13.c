@@ -263,7 +263,6 @@ static void runtime_emit(const Message *src,Doer *d)
 {
     Message m=*src;
     g_msg_created++;
-    m.id=++mint_msg_id;
     record_edge(m.trace_id,m.id,"runtime",d->name);
     if(!validate_capability(m.cap,&d->caps))
     {
@@ -377,7 +376,11 @@ static void emit_stdin_line_message(char *line)
     char *p=line;
     while(*p==' '||*p=='\t') p++;
     if(*p=='\0') return;
+    msg_id_t mid = ++mint_msg_id;
+    trace_id_t tid = ++mint_trace_id;
     Message msg={
+        .id=mid,
+        .trace_id= tid,
         .to=TARGET_A,
         .kind=MSGK_STDIN_LINE,
         .cap=1,
@@ -467,11 +470,11 @@ int main(void)
     registry_init(&reg);
     registry_add(&reg,&g_doer_a);
     registry_add(&reg,&g_doer_b);
-    Message m={.to=TARGET_BOTH,.trace_id=++          mint_trace_id,.cap=1,.payload="hi Tony."};
+    Message m={.id=++mint_msg_id,.to=TARGET_BOTH,.trace_id=++          mint_trace_id,.cap=1,.payload="hi Tony."};
     runtime_route(&m);
-    Message m1={.to=TARGET_A,.trace_id=++mint_trace_id,.cap=1,.payload="hi Bean."};
-    Message m2={.to=TARGET_B,.trace_id=++            mint_trace_id,.cap=2,.payload="hi Alex."};
-    Message m3={.to=TARGET_BOTH,.trace_id=++          mint_trace_id,.cap=2,.payload="yea all"};
+    Message m1={.id=++mint_msg_id,.to=TARGET_A,.trace_id=++mint_trace_id,.cap=1,.payload="hi Bean."};
+    Message m2={.id=++mint_msg_id,.to=TARGET_B,.trace_id=++mint_trace_id,.cap=2,.payload="hi Alex."};
+    Message m3={.id=++mint_msg_id,.to=TARGET_BOTH,.trace_id=++mint_trace_id,.cap=2,.payload="yea all"};
     runtime_route(&m1);
     runtime_route(&m2);
     runtime_route(&m3);
