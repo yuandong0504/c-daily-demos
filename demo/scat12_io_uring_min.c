@@ -36,6 +36,7 @@ static struct io_uring g_ring;
 static char g_stdin_buf[1024];
 
 static int g_running=1;
+static int g_edge_count=0;
 // === MINT ===
 // Responsible for creating unique message/capability identities.
 static msg_id_t mint_msg_id=0;
@@ -44,6 +45,7 @@ static cap_id_t mint_cap_id=0;
 #define USE_CURRENT_OFFSET (-1)
 #define FILE_OFFSET_START (0)
 #define NO_FLAGS (0)
+#define MAX_EDGES 1024
 
 typedef enum{
     CMD_SEND_A,
@@ -68,14 +70,35 @@ typedef enum{
 typedef struct{
     msg_id_t id;
     cap_id_t cap;
+    trace_id_t trace_id;
     MessageKind kind;
     Target to;
     char *payload;
 }Message;
 typedef struct{
+    trace_id_t trace_id;
+    msg_id_t msg_id;
+    const char *from;
+    const char *to;
+}MsgEdge;
+static MsgEdge g_edges[MAX_EDGES];
+typedef struct{
     cap_id_t allowed_caps[4];
     int cap_count;
 }CapabilitySet;
+static void record_edge(trace_id_t trace_id,
+                        msg_id_t msg_id,
+                        const char *from,
+                        const char *to)
+{
+    if(g_edge_count>=MAX_EDGES)return;
+    g_edges[g_edge_count++]=(MsgEdge){
+        .trace_id=trace_id,
+            .msg_id=msg_id,
+            .from=from,
+            .to=to
+    };
+}
 static Command parse_command(char *line)
 {
     Command cmd={.type=CMD_UNKNOWN,.text=NULL};
@@ -241,6 +264,7 @@ static void runtime_emit(const Message *src,Doer *d)
     Message m=*src;
     g_msg_created++;
     m.id=++mint_msg_id;
+    record_edge(m.trace_id,m.id,"runtime",d->name);
     if(!validate_capability(m.cap,&d->caps))
     {
         runtime_record_drop(&m, d);
@@ -337,6 +361,10 @@ static void scheduler_round(Scheduler *s)
         Message m;
         if(inbox_pop(&d->inbox,&m)==0)
         {
+            record_edge(m.trace_id,
+                        m.id,
+                        d->name,
+                        "handled");
             d->handle(d,&m);
             g_msg_handled++;
         }
@@ -344,6 +372,7 @@ static void scheduler_round(Scheduler *s)
 }
 // External world → CMR boundary
 // Raw events must be converted into Messages before entering runtime.
+static trace_id_t trace_id_mint=0;
 static void emit_stdin_line_message(char *line)
 {
     char *p=line;
@@ -353,8 +382,10 @@ static void emit_stdin_line_message(char *line)
         .to=TARGET_A,
         .kind=MSGK_STDIN_LINE,
         .cap=1,
+        .trace_id=++trace_id_mint,
         .payload=p
     };
+    record_edge(msg.trace_id,0,"WORLD","stdin");
     runtime_route(&msg);
 }
 static void emit_stdin_event(void)
@@ -405,6 +436,20 @@ static void on_sigint(int signo)
     (void)signo;
     g_running=0;
 }
+static void dump_trace(trace_id_t trace_id)
+{
+    printf("info of trace_id %"PRIu64":\n",trace_id);
+    for(int i=0;i<g_edge_count;i++)
+    {
+        if(g_edges[i].trace_id==trace_id)
+        {
+            printf("msg %"PRIu64" %s->%s\n",
+                   g_edges[i].msg_id,
+                   g_edges[i].from,
+                   g_edges[i].to);
+        }
+    }
+}
 int main(void)
 {
     printf("=== SCAT12: io_uring minimal ===\n");
@@ -444,5 +489,6 @@ int main(void)
     
     io_uring_queue_exit(&g_ring);
     printf("io_uring is cleaned.\n");
+    dump_trace(1);
     return 0;
 }
