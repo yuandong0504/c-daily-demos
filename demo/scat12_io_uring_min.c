@@ -22,6 +22,10 @@
 #include <string.h>
 #include <signal.h>
 
+typedef uint64_t cap_id_t;
+typedef uint64_t msg_id_t;
+typedef uint64_t trace_id_t;
+
 static unsigned long g_msg_created  = 0;
 static unsigned long g_msg_handled  = 0;
 static unsigned long g_msg_dropped  = 0;
@@ -32,8 +36,8 @@ static char g_stdin_buf[1024];
 static int g_running=1;
 // === MINT ===
 // Responsible for creating unique message/capability identities.
-static int mint_msg_id=0;
-static int mint_cap_id=0;
+static msg_id_t mint_msg_id=0;
+static cap_id_t mint_cap_id=0;
 
 #define USE_CURRENT_OFFSET (-1)
 #define FILE_OFFSET_START (0)
@@ -60,8 +64,8 @@ typedef enum{
     MSGK_STDIN_LINE
 }MessageKind;
 typedef struct{
-    int id;
-    int cap;
+    msg_id_t id;
+    cap_id_t cap;
     MessageKind kind;
     Target to;
     char *payload;
@@ -176,12 +180,12 @@ static void doer_a_handle(Doer *self,const Message *msg)
     {
         printf("[A]:message from stdin\n");
     }
-    printf("msg %d cap %d [A]:%s\n",msg->id,msg->cap,msg->payload);
+    printf("msg %"PRIu64" cap %"PRIu64" [A]:%s\n",msg->id,msg->cap,msg->payload);
 }
 static void doer_b_handle(Doer *self,const Message *  msg)
 {
     (void)self;
-    printf("msg %d cap %d [B]:%s\n",msg->id,msg->cap,msg->payload);
+    printf("msg %"PRIu64" cap %"PRIu64" [B]:%s\n",msg->id,msg->cap,msg->payload);
 }
 static Doer g_doer_a;
 static Doer g_doer_b;
@@ -201,7 +205,7 @@ static void runtime_init(void)
 }
 // === MINT ===
 // Responsible for creating unique message/capability identities.
-static int mint_new_cap(void)
+static cap_id_t mint_new_cap(void)
 {
     return ++mint_cap_id;
 }
@@ -221,7 +225,7 @@ static void runtime_record_drop(const Message *m, Doer *d)
 {
     g_msg_dropped++;
     printf(
-    "[DROP] msg=%d cap=%d to=%s payload=\"%s\"\n",
+    "[DROP] msg=%"PRIu64" cap=%"PRIu64" to=%s payload=\"%s\"\n",
     m->id,
     m->cap,
     d->name,
