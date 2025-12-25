@@ -444,7 +444,7 @@ static void dump_trace(trace_id_t trace_id)
 }
 int main(void)
 {
-    printf("=== SCAT13: Message Topology Exposure ===\n");
+    printf("=== SCAT14: Message Topology Exposure ===\n");
     signal(SIGINT,on_sigint);
 
     int ret;
@@ -484,13 +484,13 @@ int main(void)
     tid=++mint_trace_id;
     /* to A */
     mid = ++mint_msg_id;
-    Message mA1 = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    Message mA1 = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=2, .payload="hi Tony." };
     runtime_route(&mA1);
     
     /* to B */
     mid = ++mint_msg_id;
     Message mB1={.id=mid,.to=TARGET_BOTH,.trace_id=tid,.cap=2,.payload="yea all"};
-    runtime_route(&mB);
+    runtime_route(&mB1);
 
     Scheduler sched={.reg=&reg};
     while(g_running)
