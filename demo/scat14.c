@@ -1,16 +1,8 @@
 /*
- * SCAT13 — Message Topology Exposure
- *
- * Status: COMPLETE
- *
- * Scope:
- *   - expose runtime message flow as edges
- *
- * Non-goals:
- *   - explanation
- *   - causality
- *   - authority
- *   - responsibility
+ * SCAT14 Invariants:
+ * 1. Every Message has exactly one direct parent_msg_id
+ * 2. parent_msg_id == 0 means WORLD boundary
+ * 3. Derived messages inherit trace_id, do NOT mint new trace
  */
 #include <stdio.h>
 #include <string.h>
@@ -287,8 +279,7 @@ static void runtime_route(const Message *msg)
             runtime_emit(msg,&g_doer_b);
             break;
         case TARGET_BOTH:
-            runtime_emit(msg,&g_doer_a);
-            runtime_emit(msg,&g_doer_b);
+            fprintf(stderr, "[BUG] TARGET_BOTH must not enter runtime; producer must fan-out\n");
             break;
     }
 }
@@ -469,22 +460,38 @@ int main(void)
     registry_init(&reg);
     registry_add(&reg,&g_doer_a);
     registry_add(&reg,&g_doer_b);
-    msg_id_t mid=++mint_msg_id;
-    trace_id_t tid=++mint_trace_id;
-    Message m={.id=mid,.to=TARGET_BOTH,.trace_id=tid,.cap=1,.payload="hi Tony."};
-    runtime_route(&m);
+
+    trace_id_t tid = ++mint_trace_id;
+    /* to A */
+    msg_id_t mid = ++mint_msg_id;
+    Message mA = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    runtime_route(&mA);
+    /* to B */
+    mid = ++mint_msg_id;
+    Message mB = { .id=mid, .to=TARGET_B, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    runtime_route(&mB);
+
     mid=++mint_msg_id;
     tid=++mint_trace_id;
     Message m1={.id=mid,.to=TARGET_A,.trace_id=tid,.cap=1,.payload="hi Bean."};
+    runtime_route(&m1);
+
     mid=++mint_msg_id;
     tid=++mint_trace_id;
     Message m2={.id=mid,.to=TARGET_B,.trace_id=tid,.cap=2,.payload="hi Alex."};
-    mid=++mint_msg_id;
-    tid=++mint_trace_id;
-    Message m3={.id=mid,.to=TARGET_BOTH,.trace_id=tid,.cap=2,.payload="yea all"};
-    runtime_route(&m1);
     runtime_route(&m2);
-    runtime_route(&m3);
+
+    tid=++mint_trace_id;
+    /* to A */
+    mid = ++mint_msg_id;
+    Message mA1 = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    runtime_route(&mA1);
+    
+    /* to B */
+    mid = ++mint_msg_id;
+    Message mB1={.id=mid,.to=TARGET_BOTH,.trace_id=tid,.cap=2,.payload="yea all"};
+    runtime_route(&mB);
+
     Scheduler sched={.reg=&reg};
     while(g_running)
     {
