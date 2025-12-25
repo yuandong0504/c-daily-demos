@@ -484,12 +484,12 @@ int main(void)
     tid=++mint_trace_id;
     /* to A */
     mid = ++mint_msg_id;
-    Message mA1 = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=2, .payload="hi Tony." };
+    Message mA1 = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=2, .payload="yea all" };
     runtime_route(&mA1);
     
     /* to B */
     mid = ++mint_msg_id;
-    Message mB1={.id=mid,.to=TARGET_BOTH,.trace_id=tid,.cap=2,.payload="yea all"};
+    Message mB1={.id=mid,.to=TARGET_B,.trace_id=tid,.cap=2,.payload="yea all"};
     runtime_route(&mB1);
 
     Scheduler sched={.reg=&reg};
