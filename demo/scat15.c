@@ -66,10 +66,7 @@ typedef struct{
     const char *to;
 }MsgEdge;
 static MsgEdge g_edges[MAX_EDGES];
-typedef struct{
-    cap_id_t allowed_caps[4];
-    int cap_count;
-}CapabilitySet;
+
 enum {TRACE_NONE=0};
 
 static trace_id_t mint_trace(void)
@@ -200,7 +197,6 @@ typedef struct Doer Doer;
 struct Doer{
     const char *name;
     Inbox inbox;
-    CapabilitySet caps;
     void (*handle)(Doer *self,const Message *msg);
 };
 static void doer_a_handle(Doer *self,const Message *msg)
@@ -228,27 +224,12 @@ static void runtime_init(void)
     g_doer_a.name="A";
     g_doer_a.handle=doer_a_handle;
     inbox_init(&g_doer_a.inbox);
-    g_doer_a.caps.allowed_caps[0]=1;
-    g_doer_a.caps.cap_count=1;
 
     g_doer_b.name="B";
     g_doer_b.handle=doer_b_handle;
     inbox_init(&g_doer_b.inbox);
-    g_doer_b.caps.allowed_caps[0]=2;
-    g_doer_b.caps.cap_count=1;
 }
-// === VALIDATE ===
-// Determines whether a minted capability is usable by a given doer.
-// Returns boolean only. No side effects.
-static int validate_capability(cap_id_t cap,const CapabilitySet *set)
-{
-    for(int i=0;i<set->cap_count;i++)
-    {
-        if(set->allowed_caps[i]==cap) 
-            return 1;
-    }
-    return 0;
-}
+
 static void runtime_record_drop(const Message *m, Doer *d)
 {
     record_edge(m->trace_id,m->id,m->parent_msg_id,d->name,"dropped");
@@ -262,18 +243,13 @@ static void runtime_record_drop(const Message *m, Doer *d)
     m->payload ? m->payload : "");
 }
 // === RUNTIME ===
-// Executes already-validated actions.
 // Does NOT perform permission checks.
 static void runtime_emit(const Message *src,Doer *d)
 {
     Message m=*src;
     g_msg_created++;
     record_edge(m.trace_id,m.id,m.parent_msg_id,"runtime",d->name);
-    if(!validate_capability(m.cap,&d->caps))
-    {
-        runtime_record_drop(&m, d);
-    }
-    else if (inbox_push(&d->inbox, &m) != 0)
+    if (inbox_push(&d->inbox, &m) != 0)
     {
         runtime_record_drop(&m, d);
     }
