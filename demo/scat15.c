@@ -23,9 +23,6 @@ static char g_stdin_buf[1024];
 static int g_running=1;
 static int g_edge_count=0;
 static trace_id_t g_trace_max = 0;
-// === MINT ===
-// Responsible for creating unique message/capability identities.
-static cap_id_t mint_cap_id=0;
 
 #define USE_CURRENT_OFFSET (-1)
 #define FILE_OFFSET_START (0)
@@ -239,12 +236,6 @@ static void runtime_init(void)
     inbox_init(&g_doer_b.inbox);
     g_doer_b.caps.allowed_caps[0]=2;
     g_doer_b.caps.cap_count=1;
-}
-// === MINT ===
-// Responsible for creating unique message/capability identities.
-static cap_id_t mint_new_cap(void)
-{
-    return ++mint_cap_id;
 }
 // === VALIDATE ===
 // Determines whether a minted capability is usable by a given doer.
