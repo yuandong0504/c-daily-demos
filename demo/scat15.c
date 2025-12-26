@@ -24,9 +24,7 @@ static int g_running=1;
 static int g_edge_count=0;
 // === MINT ===
 // Responsible for creating unique message/capability identities.
-static msg_id_t mint_msg_id=0;
 static cap_id_t mint_cap_id=0;
-static trace_id_t mint_trace_id=0;
 
 #define USE_CURRENT_OFFSET (-1)
 #define FILE_OFFSET_START (0)
@@ -78,10 +76,13 @@ enum {TRACE_NONE=0};
 
 static trace_id_t mint_trace(void)
 {
+    static trace_id_t mint_trace_id=0;
     return ++mint_trace_id;
 }
 static void mint_message(Message *m)
 {
+    static msg_id_t mint_msg_id=0;
+
     if(m->trace_id==TRACE_NONE)
     {
         m->trace_id=mint_trace();
@@ -448,11 +449,15 @@ static void on_sigint(int signo)
 }
 static void dump_trace(trace_id_t trace_id)
 {
-    printf("\n");
+    int printed = 0;
     for(int i=0;i<g_edge_count;i++)
     {
         if(g_edges[i].trace_id==trace_id)
         {
+            if (!printed) {
+                printf("\n");      // ← 罪魁祸首
+                printed = 1;
+            }
             printf("msg %"PRIu64" (p %"PRIu64") %s->%s\n",
                    g_edges[i].msg_id,
                    g_edges[i].parent_msg_id,
@@ -523,6 +528,6 @@ int main(void)
     
     io_uring_queue_exit(&g_ring);
     printf("io_uring is cleaned.\n");
-    for(int i=0;i<mint_trace_id;i++)dump_trace(i+1); 
+    for(int i=0;i<g_edge_count;i++) dump_trace(i+1); 
     return 0;
 }
