@@ -22,6 +22,7 @@ static char g_stdin_buf[1024];
 
 static int g_running=1;
 static int g_edge_count=0;
+static trace_id_t g_trace_max = 0;
 // === MINT ===
 // Responsible for creating unique message/capability identities.
 static cap_id_t mint_cap_id=0;
@@ -77,7 +78,9 @@ enum {TRACE_NONE=0};
 static trace_id_t mint_trace(void)
 {
     static trace_id_t mint_trace_id=0;
-    return ++mint_trace_id;
+    trace_id_t t = ++mint_trace_id;
+    g_trace_max = t;
+    return t;
 }
 static void mint_message(Message *m)
 {
@@ -449,15 +452,10 @@ static void on_sigint(int signo)
 }
 static void dump_trace(trace_id_t trace_id)
 {
-    int printed = 0;
     for(int i=0;i<g_edge_count;i++)
     {
         if(g_edges[i].trace_id==trace_id)
         {
-            if (!printed) {
-                printf("\n");      // ← 罪魁祸首
-                printed = 1;
-            }
             printf("msg %"PRIu64" (p %"PRIu64") %s->%s\n",
                    g_edges[i].msg_id,
                    g_edges[i].parent_msg_id,
@@ -528,6 +526,10 @@ int main(void)
     
     io_uring_queue_exit(&g_ring);
     printf("io_uring is cleaned.\n");
-    for(int i=0;i<g_edge_count;i++) dump_trace(i+1); 
+    for(int i=0;i<g_trace_max;i++)
+    {
+        printf("\n");
+        dump_trace(i+1);
+    }
     return 0;
 }
