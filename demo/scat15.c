@@ -74,6 +74,7 @@ typedef struct{
     cap_id_t allowed_caps[4];
     int cap_count;
 }CapabilitySet;
+enum {TRACE_NONE=0};
 static void record_edge(trace_id_t trace_id,
                         msg_id_t msg_id,
                         msg_id_t parent_msg_id,
@@ -449,6 +450,18 @@ static void dump_trace(trace_id_t trace_id)
         }
     }
 }
+static trace_id_t mint_trace(void)
+{
+    return ++mint_trace_id;
+}
+static void mint_message(Messge *m)
+{
+    if(m->trace_id==TRACE_NONE)
+    {
+        m->trace_id=mint_trace();
+    }
+    m->id=++mint_msg_id;
+}
 int main(void)
 {
     printf("=== SCAT15: Message Structured Reaction (SSR) ===\n");
@@ -468,35 +481,33 @@ int main(void)
     registry_add(&reg,&g_doer_a);
     registry_add(&reg,&g_doer_b);
 
-    trace_id_t tid = ++mint_trace_id;
+    trace_id_t tid = mint_trace();
     /* to A */
-    msg_id_t mid = ++mint_msg_id;
-    Message mA = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    Message mA = {.to=TARGET_A, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    mint_message(&mA);
     runtime_route(&mA);
     /* to B */
-    mid = ++mint_msg_id;
-    Message mB = { .id=mid, .to=TARGET_B, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    Message mB = {.to=TARGET_B, .trace_id=tid, .cap=1, .payload="hi Tony." };
+    mint_message(&mB);
     runtime_route(&mB);
 
-    mid=++mint_msg_id;
-    tid=++mint_trace_id;
-    Message m1={.id=mid,.to=TARGET_A,.trace_id=tid,.cap=1,.payload="hi Bean."};
+    Message m1={.to=TARGET_A,.trace_id=TRACE_NONE,.cap=1,.payload="hi Bean."};
+    mint_message(&m1);
     runtime_route(&m1);
 
-    mid=++mint_msg_id;
-    tid=++mint_trace_id;
-    Message m2={.id=mid,.to=TARGET_B,.trace_id=tid,.cap=2,.payload="hi Alex."};
+    Message m2={.to=TARGET_B,.trace_id=TRACE_NONE,.cap=2,.payload="hi Alex."};
+    mint_message(&m2);
     runtime_route(&m2);
 
-    tid=++mint_trace_id;
+    tid=mint_trace();
     /* to A */
-    mid = ++mint_msg_id;
-    Message mA1 = { .id=mid, .to=TARGET_A, .trace_id=tid, .cap=2, .payload="yea all" };
+    Message mA1 = {.to=TARGET_A, .trace_id=tid, .cap=2, .payload="yea all" };
+    mint_message(&mA1);
     runtime_route(&mA1);
     
     /* to B */
-    mid = ++mint_msg_id;
-    Message mB1={.id=mid,.to=TARGET_B,.trace_id=tid,.cap=2,.payload="yea all"};
+    Message mB1={.to=TARGET_B,.trace_id=tid,.cap=2,.payload="yea all"};
+    mint_message(&mB1);
     runtime_route(&mB1);
 
     Scheduler sched={.reg=&reg};
