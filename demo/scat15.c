@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-typedef uint64_t cap_id_t;
+typedef int cap_id_t;
 typedef uint64_t msg_id_t;
 typedef uint64_t trace_id_t;
 
@@ -206,7 +206,7 @@ static void doer_a_handle(Doer *self,const Message *msg)
     {
         printf("[A]:message from stdin\n");
     }
-    printf("msg %"PRIu64" (p %"PRIu64") cap %"PRIu64" [A]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
+    printf("msg %"PRIu64" (p %"PRIu64") cap %d [A]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
 }
 static void doer_b_handle(Doer *self,const Message * msg)
 {
@@ -215,7 +215,7 @@ static void doer_b_handle(Doer *self,const Message * msg)
         printf("[B]:message from stdin\n");
     }
     (void)self;
-    printf("msg %"PRIu64" (p %"PRIu64") cap %"PRIu64" [B]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
+    printf("msg %"PRIu64" (p %"PRIu64") cap %d [B]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
 }
 static Doer g_doer_a;
 static Doer g_doer_b;
@@ -235,7 +235,7 @@ static void runtime_record_drop(const Message *m, Doer *d)
     record_edge(m->trace_id,m->id,m->parent_msg_id,d->name,"dropped");
     g_msg_dropped++;
     printf(
-    "[DROP] msg=%"PRIu64" (p %"PRIu64") cap=%"PRIu64" to=%s payload=\"%s\"\n",
+    "[DROP] msg=%"PRIu64" (p %"PRIu64") cap=%d to=%s payload=\"%s\"\n",
     m->id,
     m->parent_msg_id,
     m->cap,
