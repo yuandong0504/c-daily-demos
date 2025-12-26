@@ -60,6 +60,7 @@ typedef enum{
 }MessageKind;
 typedef struct{
     msg_id_t id;
+    msg_id_t parent_msg_id;
     cap_id_t cap;
     trace_id_t trace_id;
     MessageKind kind;
@@ -69,6 +70,7 @@ typedef struct{
 typedef struct{
     trace_id_t trace_id;
     msg_id_t msg_id;
+    msg_id_t parent_msg_id;
     const char *from;
     const char *to;
 }MsgEdge;
@@ -79,6 +81,7 @@ typedef struct{
 }CapabilitySet;
 static void record_edge(trace_id_t trace_id,
                         msg_id_t msg_id,
+                        msg_id_t parent_msg_id,
                         const char *from,
                         const char *to)
 {
@@ -86,6 +89,7 @@ static void record_edge(trace_id_t trace_id,
     g_edges[g_edge_count++]=(MsgEdge){
         .trace_id=trace_id,
             .msg_id=msg_id,
+            .parent_msg_id=parent_msg_id,
             .from=from,
             .to=to
     };
@@ -196,12 +200,16 @@ static void doer_a_handle(Doer *self,const Message *msg)
     {
         printf("[A]:message from stdin\n");
     }
-    printf("msg %"PRIu64" cap %"PRIu64" [A]:%s\n",msg->id,msg->cap,msg->payload);
+    printf("msg %"PRIu64" (p %"PRIu64") cap %"PRIu64" [A]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
 }
-static void doer_b_handle(Doer *self,const Message *  msg)
+static void doer_b_handle(Doer *self,const Message * msg)
 {
+    if(msg->kind==MSGK_STDIN_LINE)
+    {
+        printf("[B]:message from stdin\n");
+    }
     (void)self;
-    printf("msg %"PRIu64" cap %"PRIu64" [B]:%s\n",msg->id,msg->cap,msg->payload);
+    printf("msg %"PRIu64" (p %"PRIu64") cap %"PRIu64" [B]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
 }
 static Doer g_doer_a;
 static Doer g_doer_b;
@@ -239,11 +247,12 @@ static int validate_capability(cap_id_t cap,const CapabilitySet *set)
 }
 static void runtime_record_drop(const Message *m, Doer *d)
 {
-    record_edge(m->trace_id,m->id,d->name,"dropped");
+    record_edge(m->trace_id,m->id,m->parent_msg_id,d->name,"dropped");
     g_msg_dropped++;
     printf(
-    "[DROP] msg=%"PRIu64" cap=%"PRIu64" to=%s payload=\"%s\"\n",
+    "[DROP] msg=%"PRIu64" (p %"PRIu64") cap=%"PRIu64" to=%s payload=\"%s\"\n",
     m->id,
+    m->parent_msg_id,
     m->cap,
     d->name,
     m->payload ? m->payload : "");
@@ -255,7 +264,7 @@ static void runtime_emit(const Message *src,Doer *d)
 {
     Message m=*src;
     g_msg_created++;
-    record_edge(m.trace_id,m.id,"runtime",d->name);
+    record_edge(m.trace_id,m.id,m.parent_msg_id,"runtime",d->name);
     if(!validate_capability(m.cap,&d->caps))
     {
         runtime_record_drop(&m, d);
@@ -353,6 +362,7 @@ static void scheduler_round(Scheduler *s)
         {
             record_edge(m.trace_id,
                         m.id,
+                        m.parent_msg_id,
                         d->name,
                         "handled");
             d->handle(d,&m);
@@ -371,13 +381,14 @@ static void emit_stdin_line_message(char *line)
     trace_id_t tid = ++mint_trace_id;
     Message msg={
         .id=mid,
+        .parent_msg_id=0,
         .trace_id= tid,
         .to=TARGET_A,
         .kind=MSGK_STDIN_LINE,
         .cap=1,
         .payload=p
     };
-    record_edge(msg.trace_id,msg.id,"WORLD","stdin");
+    record_edge(msg.trace_id,msg.id,msg.parent_msg_id,"WORLD","stdin");
     runtime_route(&msg);
 }
 static void emit_stdin_event(void)
@@ -435,8 +446,9 @@ static void dump_trace(trace_id_t trace_id)
     {
         if(g_edges[i].trace_id==trace_id)
         {
-            printf("msg %"PRIu64" %s->%s\n",
+            printf("msg %"PRIu64" (p %"PRIu64") %s->%s\n",
                    g_edges[i].msg_id,
+                   g_edges[i].parent_msg_id,
                    g_edges[i].from,
                    g_edges[i].to);
         }
