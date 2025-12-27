@@ -29,6 +29,7 @@ static trace_id_t g_trace_max = 0;
 #define NO_FLAGS (0)
 #define MAX_EDGES 1024
 #define MAX_STEPS 8
+#define SIGQ_CAP 64
 
 typedef enum{
     CMD_SEND_A,
@@ -41,6 +42,14 @@ typedef struct Command{
     CommandType type;
     char *text;
 }Command;
+typedef enum{
+    WORK_OK=0,
+    WORK_ERROR=1,
+}WorkResult;
+typedef struct{
+    msg_id_t msg_id;
+    WorkResult result;
+}WorkSignal;
 typedef enum{
     TARGET_A,
     TARGET_B,
@@ -78,7 +87,26 @@ typedef struct{
 }MsgEdge;
 static MsgEdge g_edges[MAX_EDGES];
 
+static WorkSignal g_sigq[SIGQ_CAP];
+static int g_sig_h=0,g_sig_t=0;
+static int sigq_empty(void) { return g_sig_h == g_sig_t; }
+static int sigq_full(void)  { return ((g_sig_t + 1) % SIGQ_CAP) == g_sig_h; }
+static int sigq_push(const WorkSignal *s)
+{
+    if (sigq_full()) return -1;
+    g_sigq[g_sig_t] = *s;
+    g_sig_t = (g_sig_t + 1) % SIGQ_CAP;
+    return 0;
+}
+static int sigq_pop(WorkSignal *out)
+{
+    if (sigq_empty()) return -1;
+    *out = g_sigq[g_sig_h];
+    g_sig_h = (g_sig_h + 1) % SIGQ_CAP;
+    return 0;
+}
 enum {TRACE_NONE=0};
+
 
 static trace_id_t mint_trace(void)
 {
@@ -318,7 +346,7 @@ static int validate_steps(const TargetSteps *s, const DoerRegistry *reg)
 {
     (void)reg;
     if (!s) return -1;
-    if (s->count <= 0 || s->count > 8) return -1;
+    if (s->count <=0||s->count>MAX_STEPS) return -1;
 
     for (int i = 0; i < s->count; i++) {
         // target 必须是已知枚举
