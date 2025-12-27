@@ -28,6 +28,7 @@ static trace_id_t g_trace_max = 0;
 #define FILE_OFFSET_START (0)
 #define NO_FLAGS (0)
 #define MAX_EDGES 1024
+#define MAX_STEPS 8
 
 typedef enum{
     CMD_SEND_A,
@@ -50,6 +51,14 @@ typedef enum{
     MSGK_STDIN_LINE
 }MessageKind;
 typedef struct{
+    Target target;
+    cap_id_t cap;
+}Step;
+typedef struct{
+    Step steps[MAX_STEPS];
+    int count;
+}TargetSteps;
+typedef struct{
     msg_id_t id;
     msg_id_t parent_msg_id;
     cap_id_t cap;
@@ -57,6 +66,8 @@ typedef struct{
     MessageKind kind;
     Target to;
     char *payload;
+    const TargetSteps *steps;
+    int step_idx;
 }Message;
 typedef struct{
     trace_id_t trace_id;
@@ -142,17 +153,14 @@ C2MResult command_to_message(Command *cmd,Message *msg)
         case CMD_SEND_A:
             msg->to=TARGET_A;
             msg->payload=cmd->text;
-            //g_msg_created++;
             return C2M_OK;
         case CMD_SEND_B:
             msg->to=TARGET_B;
             msg->payload=cmd->text;
-            //g_msg_created++;
             return C2M_OK;
         case CMD_SEND_BOTH:
             msg->to=TARGET_BOTH;
             msg->payload=cmd->text;
-            //g_msg_created++;
             return C2M_OK;
         case CMD_EXIT:
             return C2M_CTRL_EXIT;
@@ -219,6 +227,13 @@ static void doer_b_handle(Doer *self,const Message * msg)
 }
 static Doer g_doer_a;
 static Doer g_doer_b;
+static const TargetSteps STEP_STDIN_A_THEN_B={
+    .steps={
+        {.target=TARGET_A,.cap=0},
+        {.target=TARGET_B,.cap=0},
+    },
+    .count=2
+}; 
 static void runtime_init(void)
 {
     g_doer_a.name="A";
@@ -298,6 +313,33 @@ static int registry_add(DoerRegistry *r,Doer *d)
 typedef struct{
     DoerRegistry *reg;
 }Scheduler;
+
+static int validate_steps(const TargetSteps *s, const DoerRegistry *reg)
+{
+    (void)reg;
+    if (!s) return -1;
+    if (s->count <= 0 || s->count > 8) return -1;
+
+    for (int i = 0; i < s->count; i++) {
+        // target 必须是已知枚举
+        if (s->steps[i].target != TARGET_A &&
+            s->steps[i].target != TARGET_B) {
+            return -1;
+        }
+        // cap 必须是一个“显式 token”
+        if (s->steps[i].cap < 0) return -1;
+    }
+    return 0;
+}
+
+static const TargetSteps* assemble_steps(const TargetSteps *s, const DoerRegistry *reg)
+{
+    if (validate_steps(s, reg) != 0) {
+        fprintf(stderr, "[STEPS_INVALID]\n");
+        return NULL;
+    }
+    return s;
+}
 static int scheduler_has_work(const Scheduler *s)
 {
     for(int i=0;i<s->reg->count;i++)
@@ -354,16 +396,23 @@ static void scheduler_round(Scheduler *s)
 // Raw events must be converted into Messages before entering runtime.
 static void emit_stdin_line_message(char *line)
 {
+    const TargetSteps *steps =assemble_steps(&STEP_STDIN_A_THEN_B,NULL);
+    if(!steps)return;
+
     char *p=line;
     while(*p==' '||*p=='\t') p++;
     if(*p=='\0') return;
     Message msg={
         .parent_msg_id=0,
         .trace_id=TRACE_NONE,
-        .to=TARGET_A,
         .kind=MSGK_STDIN_LINE,
-        .cap=1,
-        .payload=p
+        .payload=p,
+
+        .steps=steps,
+        .step_idx=0,
+        .to=steps->steps[0].target,
+        .cap=steps->steps[0].cap,
+
     };
     mint_message(&msg);
     record_edge(msg.trace_id,msg.id,msg.parent_msg_id,"WORLD","stdin");
@@ -430,8 +479,7 @@ static void dump_trace(trace_id_t trace_id)
                    g_edges[i].to);
         }
     }
-}
-
+} 
 int main(void)
 {
     printf("=== SCAT15: Message Structured Reaction (SSR) ===\n");
