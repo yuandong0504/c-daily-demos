@@ -46,10 +46,6 @@ typedef enum{
     WORK_OK=0,
     WORK_ERROR=1,
 }WorkResult;
-typedef struct{
-    msg_id_t msg_id;
-    WorkResult result;
-}WorkSignal;
 typedef enum{
     TARGET_A,
     TARGET_B,
@@ -79,6 +75,10 @@ typedef struct{
     int step_idx;
 }Message;
 typedef struct{
+    const Message *msg;
+    WorkResult result;
+}WorkSignal;
+typedef struct{
     trace_id_t trace_id;
     msg_id_t msg_id;
     msg_id_t parent_msg_id;
@@ -104,6 +104,14 @@ static int sigq_pop(WorkSignal *out)
     *out = g_sigq[g_sig_h];
     g_sig_h = (g_sig_h + 1) % SIGQ_CAP;
     return 0;
+}
+static void signal_emit(const Message *m, WorkResult r)
+{
+    WorkSignal s = {
+        .msg = m,
+        .result = r,
+    };
+    sigq_push(&s);
 }
 enum {TRACE_NONE=0};
 
@@ -243,6 +251,7 @@ static void doer_a_handle(Doer *self,const Message *msg)
         printf("[A]:message from stdin\n");
     }
     printf("msg %"PRIu64" (p %"PRIu64") cap %d [A]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
+    signal_emit(msg, WORK_OK);
 }
 static void doer_b_handle(Doer *self,const Message * msg)
 {
@@ -252,7 +261,9 @@ static void doer_b_handle(Doer *self,const Message * msg)
     }
     (void)self;
     printf("msg %"PRIu64" (p %"PRIu64") cap %d [B]:%s\n",msg->id,msg->parent_msg_id,msg->cap,msg->payload);
+    signal_emit(msg, WORK_OK);
 }
+
 static Doer g_doer_a;
 static Doer g_doer_b;
 static const TargetSteps STEP_STDIN_A_THEN_B={
@@ -400,7 +411,6 @@ static void runtime_print_message_balance(const DoerRegistry *reg)
        g_msg_created, g_msg_handled, g_msg_dropped,pending, balance);
 }
 // === RUNTIME ===
-// Executes already-validated actions.
 // Does NOT perform permission checks.
 static void scheduler_round(Scheduler *s)
 {
@@ -507,7 +517,41 @@ static void dump_trace(trace_id_t trace_id)
                    g_edges[i].to);
         }
     }
-} 
+}
+static void reactor_run(void)
+{
+    WorkSignal s;
+
+    while (sigq_pop(&s) == 0)
+    {
+        const Message *m = s.msg;
+
+        if (s.result != WORK_OK)
+            continue;
+
+        if (!m->steps)
+            continue;
+
+        int next = m->step_idx + 1;
+        if (next >= m->steps->count)
+            continue;
+
+        Message next_msg = {
+            .parent_msg_id = m->id,
+            .trace_id      = m->trace_id,
+            .kind          = m->kind,
+            .payload       = m->payload,
+
+            .steps    = m->steps,
+            .step_idx = next,
+            .to       = m->steps->steps[next].target,
+            .cap      = m->steps->steps[next].cap,
+        };
+
+        mint_message(&next_msg);
+        runtime_route(&next_msg);
+    }
+}
 int main(void)
 {
     printf("=== SCAT15: Message Structured Reaction (SSR) ===\n");
@@ -563,6 +607,7 @@ int main(void)
         while(scheduler_has_work(&sched))
         {
             scheduler_round(&sched);
+            reactor_run();
         }
         runtime_print_message_balance(&reg);
     }
