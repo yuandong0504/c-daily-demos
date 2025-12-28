@@ -74,10 +74,17 @@ typedef struct{
     const TargetSteps *steps;
     int step_idx;
 }Message;
-typedef struct{
-    const Message *msg;
+typedef struct {
+    msg_id_t   msg_id;
+    trace_id_t trace_id;
+    msg_id_t   parent_msg_id;
+    const TargetSteps *steps;
+    int step_idx;
+    MessageKind kind;
+    char *payload;
+
     WorkResult result;
-}WorkSignal;
+} WorkSignal;
 typedef struct{
     trace_id_t trace_id;
     msg_id_t msg_id;
@@ -108,10 +115,19 @@ static int sigq_pop(WorkSignal *out)
 static void signal_emit(const Message *m, WorkResult r)
 {
     WorkSignal s = {
-        .msg = m,
-        .result = r,
+        .msg_id   = m->id,
+        .trace_id = m->trace_id,
+        .kind     = m->kind,
+        .payload  = m->payload,
+        .steps    = m->steps,
+        .step_idx = m->step_idx,
+        .result   = r,
     };
-    sigq_push(&s);
+
+    if (sigq_push(&s) != 0)
+    {
+        fprintf(stderr, "[SIGQ_FULL] drop signal for msg=%"PRIu64"\n", m->id);
+    }
 }
 enum {TRACE_NONE=0};
 
@@ -236,13 +252,6 @@ static int inbox_pop(Inbox *q,Message *out)
     *out=q->msgs[q->head];
     q->head=((q->head+1)%INBOX_CAP);
     return 0;
-}
-static Message* inbox_pop_ptr(Inbox *q)
-{
-    if (inbox_empty(q)) return NULL;
-    Message *m = &q->msgs[q->head];
-    q->head = (q->head + 1) % INBOX_CAP;
-    return m;
 }
 typedef struct Doer Doer;
 struct Doer{
@@ -424,11 +433,17 @@ static void scheduler_round(Scheduler *s)
     for(int i=0;i<s->reg->count;i++)
     {
         Doer *d=s->reg->list[i];
-        Message *m = inbox_pop_ptr(&d->inbox);
-        if (!m) continue;
-        record_edge(m->trace_id, m->id, m->parent_msg_id, d->name, "handled");
-        d->handle(d, m);
-        g_msg_handled++;
+        Message m;
+        if(inbox_pop(&d->inbox,&m)==0)
+        {
+            record_edge(m.trace_id,
+                        m.id,
+                        m.parent_msg_id,
+                        d->name,
+                        "handled");
+            d->handle(d,&m);
+            g_msg_handled++;
+        }
     }
 }
 // External world → CMR boundary
@@ -525,28 +540,23 @@ static void reactor_run(void)
 
     while (sigq_pop(&s) == 0)
     {
-        const Message *m = s.msg;
-
-        if (s.result != WORK_OK)
+       if (s.result != WORK_OK)
             continue;
 
-        if (!m->steps)
-            continue;
-
-        int next = m->step_idx + 1;
-        if (next >= m->steps->count)
+        int next = s.step_idx + 1;
+        if (!s.steps || next >= s.steps->count)
             continue;
 
         Message next_msg = {
-            .parent_msg_id = m->id,
-            .trace_id      = m->trace_id,
-            .kind          = m->kind,
-            .payload       = m->payload,
+            .parent_msg_id = s.msg_id,
+            .trace_id      = s.trace_id,
+            .kind          = s.kind,
+            .payload       = s.payload,
 
-            .steps    = m->steps,
+            .steps    = s.steps,
             .step_idx = next,
-            .to       = m->steps->steps[next].target,
-            .cap      = m->steps->steps[next].cap,
+            .to       = s.steps->steps[next].target,
+            .cap      = s.steps->steps[next].cap,
         };
 
         mint_message(&next_msg);
