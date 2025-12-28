@@ -237,6 +237,13 @@ static int inbox_pop(Inbox *q,Message *out)
     q->head=((q->head+1)%INBOX_CAP);
     return 0;
 }
+static Message* inbox_pop_ptr(Inbox *q)
+{
+    if (inbox_empty(q)) return NULL;
+    Message *m = &q->msgs[q->head];
+    q->head = (q->head + 1) % INBOX_CAP;
+    return m;
+}
 typedef struct Doer Doer;
 struct Doer{
     const char *name;
@@ -417,17 +424,11 @@ static void scheduler_round(Scheduler *s)
     for(int i=0;i<s->reg->count;i++)
     {
         Doer *d=s->reg->list[i];
-        Message m;
-        if(inbox_pop(&d->inbox,&m)==0)
-        {
-            record_edge(m.trace_id,
-                        m.id,
-                        m.parent_msg_id,
-                        d->name,
-                        "handled");
-            d->handle(d,&m);
-            g_msg_handled++;
-        }
+        Message *m = inbox_pop_ptr(&d->inbox);
+        if (!m) continue;
+        record_edge(m->trace_id, m->id, m->parent_msg_id, d->name, "handled");
+        d->handle(d, m);
+        g_msg_handled++;
     }
 }
 // External world → CMR boundary
