@@ -618,8 +618,8 @@ int main(void)
         while(scheduler_has_work(&sched))
         {
             scheduler_round(&sched);
-            reactor_run();
         }
+        reactor_run();
         runtime_print_message_balance(&reg);
     }
     
