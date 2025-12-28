@@ -615,11 +615,14 @@ int main(void)
     while(g_running)
     {
         emit_stdin_event();
-        while(scheduler_has_work(&sched))
+        while(scheduler_has_work(&sched)||!sigq_empty())
         {
-            scheduler_round(&sched);
+            while (scheduler_has_work(&sched)) 
+            {
+                scheduler_round(&sched);
+            }
+            reactor_run();
         }
-        reactor_run();
         runtime_print_message_balance(&reg);
     }
     
