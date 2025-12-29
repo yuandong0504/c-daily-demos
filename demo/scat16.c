@@ -31,6 +31,81 @@ static trace_id_t g_trace_max = 0;
 #define MAX_STEPS 8
 #define SIGQ_CAP 64
 
+// ===== CAP (C) — resource-carrying capability =====
+typedef uint32_t cap_rights_t;
+enum { CAP_NONE = 0 };
+enum { CAP_TABLE_SIZE = 64 };
+enum {
+    CAP_R_READ  = 1u << 0,
+    CAP_R_WRITE = 1u << 1,
+};
+
+typedef struct {
+    int fd;                // anchor
+    cap_rights_t rights;   // permissions
+    int in_use;             // 0/1
+} CapEntry;
+
+static CapEntry g_caps[CAP_TABLE_SIZE];
+
+static void cap_init(void)
+{
+    for (int i = 0; i < CAP_TABLE_SIZE; i++) {
+        g_caps[i].fd = -1;
+        g_caps[i].rights = 0;
+        g_caps[i].in_use = 0;
+    }
+}
+
+static int cap_is_valid(cap_id_t cap)
+{
+    if (cap == CAP_NONE) return 0;  
+    if (cap < 0) return 0;
+    if (cap >= CAP_TABLE_SIZE) return 0;
+    return g_caps[cap].in_use == 1;
+}
+
+static cap_id_t mint_cap(int fd, cap_rights_t rights)
+{
+    if (fd < 0) return CAP_NONE;
+    for (int i = 1; i < CAP_TABLE_SIZE; i++) {
+        if (!g_caps[i].in_use) {
+            g_caps[i].fd = fd;
+            g_caps[i].rights = rights;
+            g_caps[i].in_use = 1;
+            return (cap_id_t)i;
+        }
+    }
+    return CAP_NONE;
+}
+
+static void cap_revoke(cap_id_t cap)
+{
+    if (cap <= 0 || cap >= CAP_TABLE_SIZE) return;
+    g_caps[cap].in_use = 0;
+    g_caps[cap].fd = -1;
+    g_caps[cap].rights = 0;
+}
+static int cap_write_all(cap_id_t cap, const void *buf, size_t len)
+{
+    if (!cap_is_valid(cap)) return -1;
+    if ((g_caps[cap].rights & CAP_R_WRITE) == 0) return -2;
+
+    int fd = g_caps[cap].fd;
+
+    const char *p = (const char *)buf;
+    size_t left = len;
+    while (left > 0) {
+        ssize_t n = write(fd, p, left);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return -3;
+        }
+        p += (size_t)n;
+        left -= (size_t)n;
+    }
+    return 0;
+}
 typedef enum{
     WORK_OK=0,
     WORK_ERROR=1,
