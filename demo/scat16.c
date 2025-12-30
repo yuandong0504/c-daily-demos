@@ -1,4 +1,4 @@
-/** SCAT16 — Structured Reaction (SSR) with OP (instruction) **/
+/** SCAT16 — SSR + OP, Doer Reset (homogeneous doer pool) **/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,13 +119,17 @@ static int cap_write_all(cap_id_t cap, const void *buf, size_t len)
 typedef enum {
     WORK_OK = 0,
     WORK_ERROR = 1,
-    WORK_STOP = 2,   /* explicit stop (OP_DROP etc.) */
+    WORK_STOP = 2,
 } WorkResult;
 
+/* ===== Doer Reset =====
+ * Target 不再是 A/B，而是路由策略：
+ *   ANY   : 任意 doer（轮询）
+ *   SHARD : 按 doer_id 分片到固定 doer
+ */
 typedef enum {
-    TARGET_A = 0,
-    TARGET_B = 1,
-    TARGET_BOTH = 2, /* must not enter runtime directly */
+    TARGET_ANY = 0,
+    TARGET_SHARD = 1,
 } Target;
 
 typedef enum {
@@ -142,7 +146,6 @@ typedef enum {
     OP_PRINT_LINE = 2,
     OP_WRITE_ALL = 3,
     OP_DROP = 4,
-    /* OP_FANOUT reserved (keep for future) */
 } OpKind;
 
 static const char* op_name(OpKind op)
@@ -163,7 +166,7 @@ static const char* op_name(OpKind op)
 #define MAX_STEPS 8
 
 typedef struct {
-    Target  target;
+    Target  target;   /* routing policy */
     cap_id_t cap;
     OpKind  op;
 } Step;
@@ -173,26 +176,29 @@ typedef struct {
     int count;
 } TargetSteps;
 
+typedef uint32_t doer_id_t;
+
 typedef struct {
     msg_id_t     id;
     msg_id_t     parent_msg_id;
     trace_id_t   trace_id;
-    MessageKind  kind;
 
+    doer_id_t    doer_id;   /* logical ant-id (million scale is fine) */
+
+    MessageKind  kind;
     const TargetSteps *steps;
     int step_idx;
 
-    Target to;          /* current step target (redundant but handy) */
-    char  *payload;     /* owned by trace lifecycle (see below) */
+    char  *payload;     /* owned by trace lifecycle */
 } Message;
 
-/* WorkSignal carries enough to build next step message */
 typedef struct {
     msg_id_t     msg_id;
     trace_id_t   trace_id;
     msg_id_t     parent_msg_id;
     const TargetSteps *steps;
     int step_idx;
+    doer_id_t    doer_id;
     MessageKind  kind;
     char *payload;
     WorkResult result;
@@ -267,6 +273,7 @@ static void signal_emit(const Message *m, WorkResult r)
         .parent_msg_id= m->parent_msg_id,
         .steps        = m->steps,
         .step_idx     = m->step_idx,
+        .doer_id      = m->doer_id,
         .kind         = m->kind,
         .payload      = m->payload,
         .result       = r,
@@ -330,20 +337,26 @@ static int inbox_pop(Inbox *q, Message *out)
 }
 
 /* =========================
- *  Doer (homogeneous)
- * ========================= */
+ *  Doer (homogeneous pool)
+ * =========================
+ * Doer is a homogeneous actuator.
+ * Doer must not carry behavior or policy.
+ * All behavior comes from Step.op.
+ */
+#define MAX_DOERS 64
+
 typedef struct Doer {
-    const char *name; /* for observability only */
+    const char *name; /* observability only: "D0", "D1"... */
     Inbox inbox;
 } Doer;
 
-static Doer g_doer_a;
-static Doer g_doer_b;
+static Doer g_doers[MAX_DOERS];
+static char g_doer_names[MAX_DOERS][16];
+static int  g_doer_count = 0;
 
 /* =========================
  *  Doer registry / scheduler
  * ========================= */
-#define MAX_DOERS 8
 typedef struct {
     Doer *list[MAX_DOERS];
     int count;
@@ -371,37 +384,51 @@ static int scheduler_has_work(const Scheduler *s)
 }
 
 /* =========================
+ *  Doer selection (routing)
+ * ========================= */
+static Doer* pick_doer(Target t, doer_id_t doer_id)
+{
+    if (g_doer_count <= 0) return NULL;
+
+    if (t == TARGET_SHARD) {
+        return &g_doers[doer_id % (doer_id_t)g_doer_count];
+    }
+
+    /* TARGET_ANY: round-robin */
+    static unsigned rr = 0;
+    return &g_doers[(rr++) % (unsigned)g_doer_count];
+}
+
+/* =========================
  *  Runtime routing (no permission checks)
  * ========================= */
-static void runtime_record_drop(const Message *m, Doer *d)
+static void runtime_record_drop(const Message *m, const Doer *d)
 {
     record_edge(m->trace_id, m->id, m->parent_msg_id, d->name, "dropped", "inbox_full");
     g_msg_dropped++;
     fprintf(stderr,
-        "[DROP] msg=%"PRIu64" (p %"PRIu64") to=%s payload=\"%s\"\n",
-        m->id, m->parent_msg_id, d->name,
+        "[DROP] msg=%"PRIu64" (p %"PRIu64") doer=%s doer_id=%u payload=\"%s\"\n",
+        m->id, m->parent_msg_id, d->name, (unsigned)m->doer_id,
         m->payload ? m->payload : "");
-}
-
-static void runtime_emit(const Message *src, Doer *d)
-{
-    Message m = *src;
-    g_msg_created++;
-    record_edge(m.trace_id, m.id, m.parent_msg_id, "runtime", d->name, "emit");
-
-    if (inbox_push(&d->inbox, &m) != 0) {
-        runtime_record_drop(&m, d);
-    }
 }
 
 static void runtime_route(const Message *msg)
 {
-    switch (msg->to) {
-        case TARGET_A: runtime_emit(msg, &g_doer_a); break;
-        case TARGET_B: runtime_emit(msg, &g_doer_b); break;
-        case TARGET_BOTH:
-            fprintf(stderr, "[BUG] TARGET_BOTH must not enter runtime; producer must fan-out\n");
-            break;
+    if (!msg || !msg->steps) return;
+    if (msg->step_idx < 0 || msg->step_idx >= msg->steps->count) return;
+
+    const Step *st = &msg->steps->steps[msg->step_idx];
+
+    Doer *d = pick_doer(st->target, msg->doer_id);
+    if (!d) return;
+
+    Message m = *msg;
+    g_msg_created++;
+
+    record_edge(m.trace_id, m.id, m.parent_msg_id, "runtime", d->name, "emit");
+
+    if (inbox_push(&d->inbox, &m) != 0) {
+        runtime_record_drop(&m, d);
     }
 }
 
@@ -416,11 +443,10 @@ static int validate_steps(const TargetSteps *s, const DoerRegistry *reg)
 
     for (int i = 0; i < s->count; i++) {
         Target t = s->steps[i].target;
-        if (t != TARGET_A && t != TARGET_B) return -1;
+        if (t != TARGET_ANY && t != TARGET_SHARD) return -1;
 
         if (s->steps[i].cap < 0) return -1;
 
-        /* op must be known */
         OpKind op = s->steps[i].op;
         if (op != OP_NOOP &&
             op != OP_VALIDATE &&
@@ -443,9 +469,7 @@ static const TargetSteps* assemble_steps(const TargetSteps *s, const DoerRegistr
 }
 
 /* =========================
- *  Trace payload lifecycle (minimal & robust)
- *  - for stdin lines we strdup once per trace
- *  - freed when trace finishes (no more steps)
+ *  Trace payload lifecycle
  * ========================= */
 typedef struct {
     trace_id_t trace_id;
@@ -476,7 +500,6 @@ static void trace_payload_bind(trace_id_t tid, char *p)
             return;
         }
     }
-    /* fallback: leak-safe-ish (rare) */
 }
 
 static void trace_payload_release(trace_id_t tid)
@@ -497,16 +520,12 @@ static void trace_payload_release(trace_id_t tid)
  * ========================= */
 static WorkResult op_exec(const Doer *self, const Message *msg)
 {
+    (void)self;
+
     if (!msg || !msg->steps) return WORK_ERROR;
     if (msg->step_idx < 0 || msg->step_idx >= msg->steps->count) return WORK_ERROR;
 
     const Step *st = &msg->steps->steps[msg->step_idx];
-
-    /* Optional: strong invariant check */
-    if (msg->to != st->target) {
-        /* structure mismatch */
-        return WORK_ERROR;
-    }
 
     switch (st->op) {
 
@@ -517,7 +536,6 @@ static WorkResult op_exec(const Doer *self, const Message *msg)
             return WORK_STOP;
 
         case OP_VALIDATE: {
-            /* minimal structure checks only (expand later) */
             if (!msg->payload) return WORK_ERROR;
             if (st->cap < 0) return WORK_ERROR;
             return WORK_OK;
@@ -531,13 +549,15 @@ static WorkResult op_exec(const Doer *self, const Message *msg)
         }
 
         case OP_PRINT_LINE: {
+            /* 这里的 self->name 只是观测标签，不是语义角色 */
             char line[2048];
             int n = snprintf(line, sizeof(line),
-                "[%s] op=%s msg=%"PRIu64" (p %"PRIu64") cap=%d payload=\"%s\"\n",
+                "[%s] op=%s msg=%"PRIu64" (p %"PRIu64") doer_id=%u cap=%d payload=\"%s\"\n",
                 self->name,
                 op_name(st->op),
                 msg->id,
                 msg->parent_msg_id,
+                (unsigned)msg->doer_id,
                 st->cap,
                 msg->payload ? msg->payload : "");
 
@@ -582,15 +602,12 @@ static void reactor_run(void)
     while (sigq_pop(&s) == 0) {
 
         if (s.result != WORK_OK) {
-            /* STOP/ERROR ends the chain; release trace payload if this was the end */
-            /* NOTE: If you later add retries or branches, handle here. */
             trace_payload_release(s.trace_id);
             continue;
         }
 
         int next = s.step_idx + 1;
         if (!s.steps || next >= s.steps->count) {
-            /* chain complete */
             trace_payload_release(s.trace_id);
             continue;
         }
@@ -598,12 +615,12 @@ static void reactor_run(void)
         Message next_msg = {
             .parent_msg_id = s.msg_id,
             .trace_id      = s.trace_id,
+            .doer_id       = s.doer_id,
             .kind          = s.kind,
             .payload       = s.payload,
 
             .steps    = s.steps,
             .step_idx = next,
-            .to       = s.steps->steps[next].target,
         };
 
         mint_message(&next_msg);
@@ -614,28 +631,32 @@ static void reactor_run(void)
 /* =========================
  *  Stdin event -> Message (WORLD -> runtime boundary)
  * ========================= */
+static doer_id_t next_doer_id(void)
+{
+    static doer_id_t g = 0;
+    return ++g;
+}
+
 static void emit_stdin_line_message(const char *line, const TargetSteps *steps)
 {
     if (!steps) return;
 
-    /* trim leading spaces */
     const char *p = line;
     while (*p == ' ' || *p == '\t') p++;
     if (*p == '\0') return;
 
-    /* payload ownership: strdup once, bind to trace */
     char *dup = strdup(p);
     if (!dup) return;
 
     Message msg = {
         .parent_msg_id = 0,
         .trace_id      = TRACE_NONE,
+        .doer_id       = next_doer_id(), /* 每条输入一只“新蚂蚁” */
         .kind          = MSGK_STDIN_LINE,
         .payload       = dup,
 
         .steps    = steps,
         .step_idx = 0,
-        .to       = steps->steps[0].target,
     };
 
     mint_message(&msg);
@@ -742,25 +763,46 @@ static void on_sigint(int signo)
 /* =========================
  *  Runtime init
  * ========================= */
-static void runtime_init(void)
+static void runtime_init_doers(int n, DoerRegistry *reg)
 {
-    g_doer_a.name = "A";
-    inbox_init(&g_doer_a.inbox);
+    if (n <= 0) n = 1;
+    if (n > MAX_DOERS) n = MAX_DOERS;
 
-    g_doer_b.name = "B";
-    inbox_init(&g_doer_b.inbox);
+    g_doer_count = n;
+    for (int i = 0; i < n; i++) {
+        snprintf(g_doer_names[i], sizeof(g_doer_names[i]), "D%d", i);
+        g_doers[i].name = g_doer_names[i];
+        inbox_init(&g_doers[i].inbox);
+        registry_add(reg, &g_doers[i]);
+    }
 }
 
 /* =========================
  *  Example steps
- *  stdin -> A then B
  * ========================= */
 static TargetSteps make_stdin_steps(cap_id_t cap_out)
 {
     TargetSteps s = {0};
-    s.steps[0] = (Step){ .target = TARGET_A, .cap = cap_out, .op = OP_PRINT_LINE };
-    s.steps[1] = (Step){ .target = TARGET_B, .cap = cap_out, .op = OP_PRINT_LINE };
-    s.count = 2;
+
+    s.steps[0] = (Step){
+        .target = TARGET_SHARD,
+        .cap    = CAP_NONE,
+        .op     = OP_VALIDATE,
+    };
+
+    s.steps[1] = (Step){
+        .target = TARGET_ANY,
+        .cap    = cap_out,
+        .op     = OP_PRINT_LINE,
+    };
+
+    s.steps[2] = (Step){
+        .target = TARGET_ANY,
+        .cap    = CAP_NONE,
+        .op     = OP_NOOP,
+    };
+
+    s.count = 3;
     return s;
 }
 
@@ -769,17 +811,15 @@ static TargetSteps make_stdin_steps(cap_id_t cap_out)
  * ========================= */
 int main(void)
 {
-    printf("=== SCAT16: SSR + OP ===\n");
+    printf("=== SCAT16: SSR + OP (Doer Reset) ===\n");
     signal(SIGINT, on_sigint);
 
-    /* io_uring */
     int ret = io_uring_queue_init(8, &g_ring, NO_FLAGS);
     if (ret < 0) {
         fprintf(stderr, "io_uring_queue_init failed: %s\n", strerror(-ret));
         return 1;
     }
 
-    /* cap */
     cap_init();
     trace_payload_init();
 
@@ -789,17 +829,14 @@ int main(void)
         return 1;
     }
 
-    /* runtime */
-    runtime_init();
-
     DoerRegistry reg;
     registry_init(&reg);
-    registry_add(&reg, &g_doer_a);
-    registry_add(&reg, &g_doer_b);
+
+    /* doer pool size: change here (e.g. 8, 16, 64...) */
+    runtime_init_doers(8, &reg);
 
     Scheduler sched = { .reg = &reg };
 
-    /* steps */
     TargetSteps stdin_steps_storage = make_stdin_steps(cap_out);
     const TargetSteps *stdin_steps = assemble_steps(&stdin_steps_storage, &reg);
     if (!stdin_steps) {
@@ -807,17 +844,17 @@ int main(void)
         return 1;
     }
 
-    /* demo: app message (not from stdin) */
+    /* demo: app message */
     {
         trace_id_t tid = mint_trace();
         Message m = {
             .parent_msg_id = 0,
             .trace_id = tid,
+            .doer_id = 42, /* 任意逻辑身份 */
             .kind = MSGK_APP,
             .payload = "hi (app payload - not owned)",
             .steps = stdin_steps,
             .step_idx = 0,
-            .to = stdin_steps->steps[0].target,
         };
         mint_message(&m);
         record_edge(m.trace_id, m.id, m.parent_msg_id, "APP", "runtime", "seed");
@@ -845,7 +882,6 @@ int main(void)
         dump_trace(t);
     }
 
-    /* cleanup: revoke caps if you want */
     cap_revoke(cap_out);
     return 0;
 }
